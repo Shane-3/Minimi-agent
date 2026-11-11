@@ -8,7 +8,7 @@ import { CHARS_PER_TOKEN, IMPORT_MAX_BYTES, RECORD_CONTEXT_BUDGET_TOKENS } from 
 import {
   addDays,
   isValidTimeZone,
-  mostRecentMonthDayBefore,
+  mostRecentMonthDay,
   mostRecentWeekdayBefore,
   partsInZone,
   todayIn,
@@ -117,7 +117,7 @@ const importRecordSchema = z.object(
 //   { "mostRecent": "monday" }            "On Monday we shortlisted..."
 //   { "mostRecent": "thursday", "weeksEarlier": 1 }
 //   { "previousWeek": "tuesday" }         "last Tuesday"
-//   { "date": "11-03" }                   "on 3 November" (month-day)
+//   { "date": "11-03" }                   "on 3 November": the most recent one, today included
 const MIDNIGHT = { hour: 0, minute: 0, second: 0, millisecond: 0 };
 
 const weekdaySchema = z.enum(WEEKDAYS,{ error: "must be a weekday in lower case, like monday" });
@@ -592,8 +592,9 @@ function anchorDate(anchor: Anchor, today: CalendarDate): CalendarDate {
   if ("previousWeek" in anchor) {
     return weekdayOfPreviousWeek(today, anchor.previousWeek);
   }
+  // Same rule the resolver uses for "3 November", so the two always agree.
   const { month, day } = monthDay(anchor.date);
-  return mostRecentMonthDayBefore(today, month, day);
+  return mostRecentMonthDay(today, month, day);
 }
 
 function pad(value: number): string {

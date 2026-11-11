@@ -384,7 +384,7 @@ describe("prepareSample", () => {
     expect(startOf(records, "sample-postgres-hosting")).toBe(`${lastTuesday}T04:30:00.000Z`);
   });
 
-  it("finds 3 November as the most recent one before today", () => {
+  it("finds 3 November as the most recent one, today included", () => {
     const withNovemberThird = {
       records: [
         {
@@ -403,8 +403,9 @@ describe("prepareSample", () => {
     for (const today of ["2026-11-09", "2026-11-11", "2026-11-15"]) {
       expect(startFor(today)).toBe("2026-11-03T10:00:00.000Z");
     }
-    // On 3 November itself the record is last year's, so it is never in the future.
-    expect(startFor("2026-11-03")).toBe("2025-11-03T10:00:00.000Z");
+    // On 3 November itself it is today's, matching how "on 3 November" is read.
+    expect(startFor("2026-11-03")).toBe("2026-11-03T10:00:00.000Z");
+    expect(startFor("2026-11-02")).toBe("2025-11-03T10:00:00.000Z");
     expect(startFor("2027-01-05")).toBe("2026-11-03T10:00:00.000Z");
   });
 

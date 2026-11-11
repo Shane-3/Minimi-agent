@@ -83,13 +83,18 @@ A live conversation is a record of type `chat`; each message is a segment. Its t
 - The bundled sample anchors each record to the calendar instead of a fixed date, so its questions find the right record whatever day it is loaded. Weeks run Monday to Sunday.
   - `{ "mostRecent": "monday" }`: the most recent Monday before today (the CRM shortlist, for "On Monday...").
   - `{ "previousWeek": "tuesday" }`: Tuesday of the previous week (Postgres hosting, for "last Tuesday").
-  - `{ "date": "11-03" }`: the most recent 3 November before today (for "on 3 November").
+  - `{ "date": "11-03" }`: the most recent 3 November, today included (for "on 3 November"). This is the resolver's own rule, so the two always agree.
 - Sample records have fixed ids and `source = 'sample'`. Loading the sample again replaces the earlier copy, so the same fictional meeting never appears on two days.
 
 ## 4. Request flow
 
 1. **Receive.** `POST /api/chat` with message, thread id and the browser's IANA timezone. The server opens an SSE stream.
-2. **Resolve dates.** `chrono-node` turns "Monday", "last Tuesday", "3 November" into date ranges in the user's timezone. Past dates are preferred (a bare "Monday" means the most recent one).
+2. **Resolve dates.** `chrono-node` finds date phrases; code turns each into a range of days in the user's timezone. Past dates are preferred and weeks run Monday to Sunday:
+   - "Monday": the most recent Monday before today, with the one a week earlier kept as an alternative. On a Monday it means a week ago.
+   - "last Tuesday": the previous week's Tuesday.
+   - "3 November": the most recent one, today included.
+   - "two weeks ago", "last week", "last month": the whole week or month.
+   - Future phrases ("next Monday") and numeric dates ("3/11", which means different days in different countries) are not resolved.
 3. **Find records.** If everything stored fits the context budget, all of it is loaded and this step is skipped, so a paraphrased question cannot miss its record. Otherwise candidates are ranked: date match first, then FTS5 score on the message's keywords.
 4. **Load context.** Matched records go into the prompt **whole**, up to a token budget. A record over budget is loaded as its matched segments plus neighbours and marked `partial`. The prompt always includes a compact index of every record (date, type, title) so the model knows what exists and what does not.
 5. **Run the agent.** The model answers directly for recall questions, or requests searches. All searches requested in one step run in parallel. The loop repeats up to a step cap.

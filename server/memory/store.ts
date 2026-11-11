@@ -35,6 +35,11 @@ export interface SegmentHit {
   score: number;
 }
 
+export interface RecordSize {
+  chars: number;
+  segments: number;
+}
+
 /** Any database failure. Callers show a plain message and carry on without saving. */
 export class StoreError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
@@ -224,20 +229,36 @@ export class Store {
   }
 
   /**
-   * Full-text search over segment text and record titles. `match` is an FTS5
-   * query; building a safe one from a user's message is the caller's job.
+   * Full-text search over segment text and record titles, best match first.
+   * `match` is an FTS5 query; building a safe one from a user's message is
+   * the caller's job. With `recordId`, searches inside that record only.
    */
-  searchSegments(match: string, limit: number): SegmentHit[] {
+  searchSegments(match: string, limit: number, recordId?: string): SegmentHit[] {
     return guard("search records", () => {
+      const inRecord = recordId === undefined ? "" : "AND record_id = @recordId";
       return this.db
         .prepare(`
           SELECT rowid AS segmentId, record_id AS recordId, bm25(segments_fts) AS score
           FROM segments_fts
-          WHERE segments_fts MATCH ?
+          WHERE segments_fts MATCH @match ${inRecord}
           ORDER BY score
-          LIMIT ?
+          LIMIT @limit
         `)
-        .all(match, limit) as SegmentHit[];
+        .all({ match, limit, ...(recordId === undefined ? {} : { recordId }) }) as SegmentHit[];
+    });
+  }
+
+  /** Size of each record's text (speakers included), to check the context budget without loading it. */
+  recordSizes(): Map<string, RecordSize> {
+    return guard("measure records", () => {
+      const rows = this.db
+        .prepare(`
+          SELECT record_id AS recordId, SUM(LENGTH(text) + LENGTH(COALESCE(speaker, ''))) AS chars, COUNT(*) AS segments
+          FROM segments
+          GROUP BY record_id
+        `)
+        .all() as ({ recordId: string } & RecordSize)[];
+      return new Map(rows.map(({ recordId, chars, segments }) => [recordId, { chars, segments }]));
     });
   }
 

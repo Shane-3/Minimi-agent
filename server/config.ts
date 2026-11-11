@@ -18,6 +18,15 @@ export const RECORD_CONTEXT_BUDGET_TOKENS = 80_000;
 /** Rough token estimate. Good enough for a budget; no tokenizer dependency. */
 export const CHARS_PER_TOKEN = 4;
 
+/** Allowance per segment for the speaker label and line break in the prompt. */
+export const SEGMENT_OVERHEAD_TOKENS = 3;
+
+/** When a record is too long to load whole: segments kept either side of each match. */
+export const PARTIAL_NEIGHBOUR_SEGMENTS = 2;
+
+/** Search hits read when ranking records by topic. */
+export const TOPIC_SEARCH_LIMIT = 200;
+
 export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
 export const MESSAGE_MAX_CHARS = 4_000;
 

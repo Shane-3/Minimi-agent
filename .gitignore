@@ -1,0 +1,12 @@
+node_modules/
+dist/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Local SQLite memory
+*.db
+*.db-wal
+*.db-shm

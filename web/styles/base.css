@@ -1,0 +1,32 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter Variable", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 26px;
+  font-weight: 400;
+}
+
+h1 {
+  margin: 0 0 var(--space-2);
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 700;
+}
+
+p {
+  margin: 0;
+}
+
+.page {
+  max-width: var(--col);
+  margin: 0 auto;
+  padding: var(--space-12) var(--space-4);
+}

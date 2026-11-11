@@ -1,0 +1,21 @@
+:root {
+  --bg: #ffffff;
+  --surface: #f6f6f4; /* user message, cards */
+  --text: #111111;
+  --text-muted: #6b6b6b;
+  --border: #e6e6e3;
+  --accent: #f97b2d; /* state only: status, chips, links */
+  --accent-soft: #fff1e7; /* chip background */
+  --danger: #b42318;
+  --danger-soft: #fef3f2;
+  --radius: 10px;
+  --radius-pill: 999px;
+  --col: 680px; /* reading column */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+}

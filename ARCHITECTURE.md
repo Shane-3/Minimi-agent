@@ -41,7 +41,7 @@ records(
   started_at TEXT NOT NULL,      -- ISO 8601, UTC
   tz TEXT,                       -- IANA zone or offset the record was made in
   participants TEXT,             -- JSON array
-  source TEXT CHECK (source IN ('import','live')),
+  source TEXT CHECK (source IN ('import','sample','live')),
   content_hash TEXT UNIQUE       -- blocks duplicate imports
 )
 
@@ -78,8 +78,13 @@ A live conversation is a record of type `chat`; each message is a segment. Its t
 ```
 
 - `turns` may be replaced by a single `content` string; it is split on speaker labels or paragraphs.
-- Also accepted: a bare array of records, and a chat export shaped `[{timestamp, role, content}]`.
-- The bundled sample uses `daysAgo` offsets instead of fixed dates, converted at load time, so "last Tuesday" works whenever a judge runs it.
+- `timestamp` is ISO 8601. Without an offset it is read in the browser's timezone, and the import summary says so.
+- Also accepted: a bare array of records, and a chat export shaped `[{timestamp, role, content}]`. A chat export becomes one record per day in the user's timezone; when it spans several days, each part is titled with the conversation's first question and "part 1 of 2".
+- The bundled sample anchors each record to the calendar instead of a fixed date, so its questions find the right record whatever day it is loaded. Weeks run Monday to Sunday.
+  - `{ "mostRecent": "monday" }`: the most recent Monday before today (the CRM shortlist, for "On Monday...").
+  - `{ "previousWeek": "tuesday" }`: Tuesday of the previous week (Postgres hosting, for "last Tuesday").
+  - `{ "date": "11-03" }`: the most recent 3 November before today (for "on 3 November").
+- Sample records have fixed ids and `source = 'sample'`. Loading the sample again replaces the earlier copy, so the same fictional meeting never appears on two days.
 
 ## 4. Request flow
 
@@ -135,8 +140,8 @@ A live conversation is a record of type `chat`; each message is a segment. Its t
 | Route | Request | Response |
 |---|---|---|
 | `GET /api/health` | | `{ anthropic: boolean, tavily: boolean }` (whether each key is set, never the key) |
-| `POST /api/import` | `{ records: [...] }`, `timezone` | `{ imported, skipped, range: { from, to }, warnings: string[] }` |
-| `POST /api/import/sample` | `timezone` | Same as import |
+| `POST /api/import` | `{ content, timezone }`: `content` is the file's raw text | `{ imported, skipped, range: { from, to }, warnings: string[] }` |
+| `POST /api/import/sample` | `{ timezone }` | Same as import. Replaces any earlier copy of the sample |
 | `GET /api/records` | | `[{ id, type, title, startedAt, participants }]` |
 | `GET /api/records/:id` | | Record with its segments |
 | `DELETE /api/records/:id` | | `204` |
@@ -145,6 +150,8 @@ A live conversation is a record of type `chat`; each message is a segment. Its t
 | `POST /api/chat` | `{ threadId?, message, timezone }` | SSE stream (§6) |
 
 Errors from every route share one shape: `{ error: { code, message, details?: string[] } }`. `message` is written for the user and shown as is.
+
+The browser sends an import file as raw text, so every file check (JSON syntax with the line number when the parser reports one, shape, size, a leading byte-order mark) runs on the server in one tested place, with the same wording in every browser. The browser also checks `file.size` before uploading, so a file over the limit fails at once. The JSON body limit is above the file limit because escaping can double the text; a body over it gets the same `too_large` error as an oversize file.
 
 ## 9. Limits
 
@@ -158,6 +165,7 @@ Starting values, kept in one config file and tuned during evals.
 | Timeout per model call | 60 s |
 | Record context budget | about 80,000 tokens (estimated as characters ÷ 4) |
 | Import file size | 5 MB |
+| API request body | 11 MB (a 5 MB file can just over double when escaped inside JSON) |
 | Message length | 4,000 characters |
 | Model retry on error | 1, with backoff |
 

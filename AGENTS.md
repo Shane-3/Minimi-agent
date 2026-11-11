@@ -31,7 +31,7 @@ npm run typecheck
 
 - TypeScript, `strict` on. No `any` without a comment saying why.
 - Small files with one job. `server/memory/store.ts` is the only file that touches SQLite. `server/agent/loop.ts` is the only file that calls Anthropic. `server/agent/search.ts` is the only file that calls Tavily.
-- Shared types (`Record`, `Segment`, `Evidence`, `Check`, SSE events) live in `shared/types.ts` and are used by both server and web.
+- Shared types (`MemoryRecord`, `Segment`, `Evidence`, `Check`, SSE events) live in `shared/types.ts` and are used by both server and web. The record type is `MemoryRecord`, not `Record`, so it does not hide TypeScript's built-in `Record<K, V>`.
 - Validate everything that crosses a boundary with zod: env, import files, request bodies, tool inputs.
 - Every external call has a timeout and a typed error. No unhandled promise rejections.
 - Comments explain why, not what. The author must be able to explain every line, so prefer plain code over clever code.

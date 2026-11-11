@@ -14,3 +14,49 @@ export interface ApiError {
     details?: string[];
   };
 }
+
+export type RecordType = "meeting" | "chat" | "note";
+
+/** `import` came from a file or the sample; `live` is a conversation held in this app. */
+export type RecordSource = "import" | "live";
+
+/** One turn of a transcript, one paragraph of a note, or one chat message. */
+export interface Segment {
+  id: number;
+  /** Order inside the record, from 0. */
+  seq: number;
+  /** Person name, or "user" / "assistant" in chats. Null when the source gave none. */
+  speaker: string | null;
+  text: string;
+  /** ISO 8601 UTC, when the source gave a time for this segment. */
+  ts: string | null;
+}
+
+/** What the records panel lists (GET /api/records). */
+export interface RecordSummary {
+  id: string;
+  type: RecordType;
+  title: string;
+  /** ISO 8601 UTC. */
+  startedAt: string;
+  participants: string[];
+}
+
+// Named MemoryRecord rather than Record so it does not shadow TypeScript's
+// built-in Record<K, V> in files that import it.
+export interface MemoryRecord extends RecordSummary {
+  /** The zone or offset the record was made in, e.g. "Asia/Kolkata" or "+05:30". */
+  tz: string | null;
+  source: RecordSource;
+  segments: Segment[];
+}
+
+/** Response of POST /api/import and POST /api/import/sample. */
+export interface ImportResult {
+  imported: number;
+  skipped: number;
+  /** First and last record time in the file, ISO 8601 UTC. */
+  range: { from: string; to: string };
+  /** Plain sentences for the user, e.g. which records were read in an assumed timezone. */
+  warnings: string[];
+}

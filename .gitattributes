@@ -1,0 +1,2 @@
+# Same line endings on every clone, whatever the OS.
+* text=auto eol=lf

@@ -1,10 +1,11 @@
 {
-  "description": "Fictional sample history for trying the agent. The people, companies and conversations are invented. Real products are named without prices; any price must come from a live search. Dates are days before today, so relative questions like 'last Tuesday' always work.",
+  "description": "Fictional sample history for trying the agent. The people, companies and conversations are invented. Real products are named without prices; any price must come from a live search. Each record is anchored to the calendar ('when') so questions like 'On Monday...' and 'last Tuesday' find it on whatever day the sample is loaded. Weeks run Monday to Sunday.",
   "records": [
     {
+      "id": "sample-acme-kickoff",
       "type": "meeting",
       "title": "Acme onboarding kickoff",
-      "daysAgo": 9,
+      "when": { "mostRecent": "thursday", "weeksEarlier": 1 },
       "time": "11:00",
       "participants": ["Shane", "Priya (Acme)", "Rahul"],
       "turns": [
@@ -20,17 +21,58 @@
       ]
     },
     {
+      "id": "sample-postgres-hosting",
+      "type": "meeting",
+      "title": "Postgres hosting options",
+      "when": { "previousWeek": "tuesday" },
+      "time": "10:00",
+      "participants": ["Shane", "Rahul", "Meera"],
+      "turns": [
+        { "speaker": "Rahul", "text": "The reporting service needs a managed Postgres database before we launch it." },
+        { "speaker": "Shane", "text": "Which providers are we looking at?" },
+        { "speaker": "Rahul", "text": "Three: Neon, Supabase and Amazon RDS." },
+        { "speaker": "Meera", "text": "I used Supabase on a side project and found it quick to set up." },
+        { "speaker": "Rahul", "text": "I'd rather stay close to our other AWS services, so I lean towards RDS." },
+        { "speaker": "Shane", "text": "We need to see what each would cost us before choosing. Rahul, can you check the current plans for all three by Friday?" },
+        { "speaker": "Rahul", "text": "Yes, by Friday." },
+        { "speaker": "Shane", "text": "So no decision yet. We pick a provider once we have the plans side by side." }
+      ]
+    },
+    {
+      "id": "sample-acme-renewal",
+      "type": "meeting",
+      "title": "Acme renewal call",
+      "when": { "mostRecent": "thursday" },
+      "time": "15:00",
+      "participants": ["Shane", "Priya (Acme)", "Rahul"],
+      "turns": [
+        { "speaker": "Shane", "text": "Thanks for making time. Last week we left the onboarding start date open." },
+        { "speaker": "Priya (Acme)", "text": "We've talked internally. We can sign the 12-month renewal if onboarding is finished within five weeks." },
+        { "speaker": "Rahul", "text": "The migration takes three weeks, so we'd need to start on Monday to leave time for training." },
+        { "speaker": "Shane", "text": "Then let's agree on that: onboarding starts Monday and finishes within five weeks." },
+        { "speaker": "Priya (Acme)", "text": "Agreed. We'll sign on that basis." },
+        { "speaker": "Priya (Acme)", "text": "We'd also like to add 15 seats, going from 40 to 55." },
+        { "speaker": "Shane", "text": "That works. I'll send the updated order form by Monday." },
+        { "speaker": "Priya (Acme)", "text": "On the 10% discount, my finance lead still wants it." },
+        { "speaker": "Shane", "text": "I can't approve that today. I'll check with our finance team and come back to you." },
+        { "speaker": "Priya (Acme)", "text": "Fine. Then the discount stays open for now." },
+        { "speaker": "Rahul", "text": "I'll share the migration checklist with Priya's team by Tuesday." }
+      ]
+    },
+    {
+      "id": "sample-support-interviews",
       "type": "note",
       "title": "Support lead interviews",
-      "daysAgo": 7,
+      "when": { "mostRecent": "friday" },
       "time": "18:30",
       "participants": ["Shane"],
       "content": "Spoke with two candidates for the support lead role today.\n\nAnita has run a support team of six before and prefers the European shift.\n\nLeo is earlier in his career but knows the product well from a year as a customer.\n\nNext step: second interviews for both with Meera next week. No offer decided yet."
     },
     {
+      "id": "sample-crm-shortlist",
       "type": "meeting",
       "title": "CRM shortlist review",
-      "daysAgo": 5,
+      "when": { "mostRecent": "monday" },
       "time": "14:00",
       "participants": ["Shane", "Meera", "Rahul"],
       "turns": [
@@ -42,26 +84,6 @@
         { "speaker": "Rahul", "text": "My vote is Pipedrive. Our sales team found it the easiest to learn during the trial." },
         { "speaker": "Meera", "text": "I lean towards HubSpot, because our marketing team already uses it." },
         { "speaker": "Shane", "text": "Let's not pick one today. We'll compare once Meera has the pricing." }
-      ]
-    },
-    {
-      "type": "meeting",
-      "title": "Acme renewal call",
-      "daysAgo": 2,
-      "time": "15:00",
-      "participants": ["Shane", "Priya (Acme)", "Rahul"],
-      "turns": [
-        { "speaker": "Shane", "text": "Thanks for making time. Last week we left the onboarding start date open." },
-        { "speaker": "Priya (Acme)", "text": "We've talked internally. We can sign the 12-month renewal if onboarding is finished within five weeks." },
-        { "speaker": "Rahul", "text": "The migration takes three weeks, so we'd need to start on Monday to leave time for training." },
-        { "speaker": "Shane", "text": "Then let's agree on that: onboarding starts Monday and finishes within five weeks." },
-        { "speaker": "Priya (Acme)", "text": "Agreed. We'll sign on that basis." },
-        { "speaker": "Priya (Acme)", "text": "We'd also like to add 15 seats, going from 40 to 55." },
-        { "speaker": "Shane", "text": "That works. I'll send the updated order form by Thursday." },
-        { "speaker": "Priya (Acme)", "text": "On the 10% discount, my finance lead still wants it." },
-        { "speaker": "Shane", "text": "I can't approve that today. I'll check with our finance team and come back to you." },
-        { "speaker": "Priya (Acme)", "text": "Fine. Then the discount stays open for now." },
-        { "speaker": "Rahul", "text": "I'll share the migration checklist with Priya's team by Wednesday." }
       ]
     }
   ]

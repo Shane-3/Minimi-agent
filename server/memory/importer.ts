@@ -5,8 +5,20 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { ImportResult, RecordType } from "../../shared/types.ts";
 import { CHARS_PER_TOKEN, IMPORT_MAX_BYTES, RECORD_CONTEXT_BUDGET_TOKENS } from "../config.ts";
-import { daysBefore, isValidTimeZone, partsInZone, zonedToUtc, type LocalDateTime } from "./dates.ts";
-import type { NewRecord, NewSegment, Store } from "./store.ts";
+import {
+  addDays,
+  isValidTimeZone,
+  mostRecentMonthDayBefore,
+  mostRecentWeekdayBefore,
+  partsInZone,
+  todayIn,
+  weekdayOfPreviousWeek,
+  WEEKDAYS,
+  zonedToUtc,
+  type CalendarDate,
+  type LocalDateTime,
+} from "./dates.ts";
+import type { InsertResult, NewRecord, NewSegment, Store } from "./store.ts";
 
 export type ImportErrorCode = "too_large" | "invalid_json" | "empty" | "wrong_shape" | "invalid_timezone";
 
@@ -39,10 +51,12 @@ const MAX_DETAILS = 10;
 // ---------------------------------------------------------------------------
 // Step 1: text to JSON
 
+/** Shared with the API, which says the same when a request body is over its limit. */
+export const TOO_LARGE_MESSAGE = `This file is over ${IMPORT_MAX_BYTES / 1024 / 1024} MB. Split it and upload the parts.`;
+
 export function parseImportText(text: string): unknown {
   if (Buffer.byteLength(text, "utf8") > IMPORT_MAX_BYTES) {
-    const megabytes = IMPORT_MAX_BYTES / 1024 / 1024;
-    throw new ImportError("too_large", `This file is over ${megabytes} MB. Split it and upload the parts.`);
+    throw new ImportError("too_large", TOO_LARGE_MESSAGE);
   }
   // Editors on Windows often save JSON with a byte-order mark, which JSON.parse rejects.
   const body = text.replace(/^﻿/, "");
@@ -98,16 +112,48 @@ const importRecordSchema = z.object(
   { error: "must be an object" },
 );
 
-// The sample gives days before today and a time of day instead of a fixed
-// timestamp, so "last Tuesday" means the same record whenever it is loaded.
+// The sample is anchored to the calendar instead of fixed timestamps, so the
+// questions it is built for work on whatever day it is loaded:
+//   { "mostRecent": "monday" }            "On Monday we shortlisted..."
+//   { "mostRecent": "thursday", "weeksEarlier": 1 }
+//   { "previousWeek": "tuesday" }         "last Tuesday"
+//   { "date": "11-03" }                   "on 3 November" (month-day)
+const MIDNIGHT = { hour: 0, minute: 0, second: 0, millisecond: 0 };
+
+const weekdaySchema = z.enum(WEEKDAYS,{ error: "must be a weekday in lower case, like monday" });
+
+const anchorSchema = z.union(
+  [
+    z.object({ mostRecent: weekdaySchema, weeksEarlier: z.number().int().min(0).optional() }).strict(),
+    z.object({ previousWeek: weekdaySchema }).strict(),
+    z
+      .object({
+        date: z
+          .string()
+          .regex(/^\d{2}-\d{2}$/)
+          // Checked against a non-leap year, so 29 February is refused: it would vanish three years in four.
+          .refine((value) => isRealDateTime({ ...MIDNIGHT, year: 2025, ...monthDay(value) })),
+      })
+      .strict(),
+  ],
+  { error: 'must be { "mostRecent": weekday }, { "previousWeek": weekday } or { "date": "MM-DD" }' },
+);
+
 const sampleRecordSchema = z.object(
   {
     ...recordFields,
-    daysAgo: z.number({ error: "must be a number" }).int().min(0),
+    id: z.string().regex(/^sample-[a-z0-9-]+$/, { error: 'must start with "sample-"' }),
+    when: anchorSchema,
     time: z.string().regex(/^\d{2}:\d{2}$/, { error: "must look like 15:00" }),
   },
   { error: "must be an object" },
 );
+
+type Anchor = z.infer<typeof anchorSchema>;
+
+function monthDay(value: string): { month: number; day: number } {
+  return { month: Number(value.slice(0, 2)), day: Number(value.slice(3, 5)) };
+}
 
 const chatMessageSchema = z.object(
   {
@@ -128,7 +174,8 @@ const MISSING_FIELD: { [field: string]: string } = {
   text: "its text",
   role: "a role",
   content: "its content",
-  daysAgo: "daysAgo",
+  id: "an id",
+  when: "a when",
   time: "a time",
 };
 
@@ -277,6 +324,8 @@ function normaliseRecord(
 
 // A chat export becomes one chat record per day in the user's timezone, so a
 // question about "3 November" finds that day's messages, not the whole export.
+// When it spans several days, every part carries the conversation's title and
+// "part 1 of 2", so the records panel shows they belong together.
 function prepareChatExport(items: unknown[], timezone: string): PreparedImport {
   const messages = validateItems(items, chatMessageSchema, "Message");
   const problems: string[] = [];
@@ -298,16 +347,23 @@ function prepareChatExport(items: unknown[], timezone: string): PreparedImport {
   });
   if (problems.length > 0) throw shapeError(problems);
 
+  // Days in time order, whatever order the file listed the messages in.
+  const parts = [...days.values()].map((dayMessages) =>
+    dayMessages.sort((a, b) => a.instant.getTime() - b.instant.getTime()),
+  );
+  parts.sort((a, b) => (a[0]?.instant.getTime() ?? 0) - (b[0]?.instant.getTime() ?? 0));
+
+  const firstUser = parts.flat().find(({ message }) => message.role === "user") ?? parts[0]?.[0];
+  const conversationTitle = shortTitle(firstUser?.message.content ?? "Chat");
+
   const records: NewRecord[] = [];
-  for (const dayMessages of days.values()) {
-    dayMessages.sort((a, b) => a.instant.getTime() - b.instant.getTime());
+  for (const [index, dayMessages] of parts.entries()) {
     const segments: NewSegment[] = dayMessages.map(({ message, instant }) => ({
       speaker: message.role,
       text: message.content,
       ts: instant.toISOString(),
     }));
-    const firstUser = dayMessages.find(({ message }) => message.role === "user") ?? dayMessages[0];
-    const title = shortTitle(firstUser?.message.content ?? "Chat");
+    const title = parts.length === 1 ? conversationTitle : `${conversationTitle} (part ${index + 1} of ${parts.length})`;
     const startedAt = segments[0]?.ts ?? new Date(0).toISOString();
     records.push({
       type: "chat",
@@ -505,19 +561,39 @@ function longTitles(records: NewRecord[]): string[] {
 // ---------------------------------------------------------------------------
 // The sample
 
-/** Converts the bundled sample's relative dates to real ones, then imports it like any file. */
+/**
+ * Places the bundled sample on real dates relative to `now`, then validates it
+ * like any file. Records keep their fixed ids and are marked as the sample.
+ */
 export function prepareSample(value: unknown, timezone: string, now: Date): PreparedImport {
   if (!isValidTimeZone(timezone)) {
     throw new ImportError("invalid_timezone", `"${timezone}" isn't a timezone I recognise.`);
   }
   const items = validateItems(listOf(value), sampleRecordSchema, "Sample record");
-  const records = items.map(({ daysAgo, time, ...rest }) => {
-    const date = daysBefore(now, daysAgo, timezone);
-    const timestamp = `${date.year}-${pad(date.month)}-${pad(date.day)}T${time}:00`;
-    return { ...rest, timestamp };
+  const today = todayIn(now, timezone);
+  const inputs = items.map(({ id: _id, when, time, ...rest }) => {
+    const date = anchorDate(when, today);
+    return { ...rest, timestamp: `${date.year}-${pad(date.month)}-${pad(date.day)}T${time}:00` };
   });
-  // The sample is meant to be read in the user's zone, so that is not worth a warning.
-  return { ...prepareImport({ records }, timezone), assumedTimezone: 0 };
+
+  const prepared = prepareImport({ records: inputs }, timezone);
+  return {
+    ...prepared,
+    records: prepared.records.map((record, index) => ({ ...record, id: items[index]?.id, source: "sample" as const })),
+    // The sample is meant to be read in the user's zone, so that is not worth a warning.
+    assumedTimezone: 0,
+  };
+}
+
+function anchorDate(anchor: Anchor, today: CalendarDate): CalendarDate {
+  if ("mostRecent" in anchor) {
+    return addDays(mostRecentWeekdayBefore(today, anchor.mostRecent), -7 * (anchor.weeksEarlier ?? 0));
+  }
+  if ("previousWeek" in anchor) {
+    return weekdayOfPreviousWeek(today, anchor.previousWeek);
+  }
+  const { month, day } = monthDay(anchor.date);
+  return mostRecentMonthDayBefore(today, month, day);
 }
 
 function pad(value: number): string {
@@ -528,7 +604,15 @@ function pad(value: number): string {
 // Step 4: store and report
 
 export function importInto(store: Store, prepared: PreparedImport, timezone: string): ImportResult {
-  const { inserted, skipped } = store.insertRecords(prepared.records);
+  return summarise(prepared, store.insertRecords(prepared.records), timezone);
+}
+
+/** Loads the sample in place of any earlier copy, so it never appears twice. */
+export function loadSampleInto(store: Store, prepared: PreparedImport, timezone: string): ImportResult {
+  return summarise(prepared, store.replaceSample(prepared.records), timezone);
+}
+
+function summarise(prepared: PreparedImport, { inserted, skipped }: InsertResult, timezone: string): ImportResult {
   const times = prepared.records.map((record) => record.startedAt).sort();
 
   const warnings: string[] = [];

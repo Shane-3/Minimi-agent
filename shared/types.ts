@@ -17,8 +17,11 @@ export interface ApiError {
 
 export type RecordType = "meeting" | "chat" | "note";
 
-/** `import` came from a file or the sample; `live` is a conversation held in this app. */
-export type RecordSource = "import" | "live";
+/**
+ * `import` came from a file, `sample` from the bundled sample history (replaced
+ * as a whole when it is loaded again), `live` is a conversation held in this app.
+ */
+export type RecordSource = "import" | "sample" | "live";
 
 /** One turn of a transcript, one paragraph of a note, or one chat message. */
 export interface Segment {

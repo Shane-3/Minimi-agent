@@ -4,6 +4,8 @@ import type { MemoryRecord, RecordSource, RecordSummary, RecordType, Segment } f
 
 /** A record ready to store: validated and normalised by the importer. */
 export interface NewRecord {
+  /** Fixed ids are used by the sample; other records get a random one. */
+  id?: string;
   type: RecordType;
   title: string;
   startedAt: string;
@@ -49,7 +51,7 @@ const SCHEMA = `
     started_at TEXT NOT NULL,
     tz TEXT,
     participants TEXT NOT NULL,
-    source TEXT NOT NULL CHECK (source IN ('import', 'live')),
+    source TEXT NOT NULL CHECK (source IN ('import', 'sample', 'live')),
     content_hash TEXT NOT NULL UNIQUE
   );
 
@@ -116,45 +118,65 @@ export class Store {
    */
   insertRecords(records: NewRecord[]): InsertResult {
     return guard("save records", () => {
-      const insertRecord = this.db.prepare(`
-        INSERT INTO records (id, type, title, started_at, tz, participants, source, content_hash)
-        VALUES (@id, @type, @title, @startedAt, @tz, @participants, @source, @contentHash)
-        ON CONFLICT (content_hash) DO NOTHING
-      `);
-      const insertSegment = this.db.prepare(`
-        INSERT INTO segments (record_id, seq, speaker, text, ts) VALUES (?, ?, ?, ?, ?)
-      `);
-      const insertFts = this.db.prepare(`
-        INSERT INTO segments_fts (rowid, text, title, record_id) VALUES (?, ?, ?, ?)
-      `);
-
-      const run = this.db.transaction((batch: NewRecord[]): InsertResult => {
-        let inserted = 0;
-        for (const record of batch) {
-          const id = crypto.randomUUID();
-          const result = insertRecord.run({
-            id,
-            type: record.type,
-            title: record.title,
-            startedAt: record.startedAt,
-            tz: record.tz,
-            participants: JSON.stringify(record.participants),
-            source: record.source,
-            contentHash: record.contentHash,
-          });
-          // No change means the hash was already there: a duplicate.
-          if (result.changes === 0) continue;
-          inserted += 1;
-          record.segments.forEach((segment, seq) => {
-            const segmentResult = insertSegment.run(id, seq, segment.speaker, segment.text, segment.ts);
-            insertFts.run(segmentResult.lastInsertRowid, segment.text, record.title, id);
-          });
-        }
-        return { inserted, skipped: batch.length - inserted };
-      });
-
+      const run = this.db.transaction((batch: NewRecord[]) => this.insertBatch(batch));
       return run(records);
     });
+  }
+
+  /**
+   * Removes every sample record and stores the given ones, in one transaction.
+   * Loading the sample on a later day gives it new dates; keeping the old copy
+   * would show the same fictional meeting on two days.
+   */
+  replaceSample(records: NewRecord[]): InsertResult {
+    return guard("load the sample", () => {
+      const run = this.db.transaction((batch: NewRecord[]) => {
+        this.db
+          .prepare(`DELETE FROM segments_fts WHERE record_id IN (SELECT id FROM records WHERE source = 'sample')`)
+          .run();
+        this.db.prepare(`DELETE FROM records WHERE source = 'sample'`).run();
+        return this.insertBatch(batch);
+      });
+      return run(records);
+    });
+  }
+
+  // Callers wrap this in a transaction.
+  private insertBatch(batch: NewRecord[]): InsertResult {
+    const insertRecord = this.db.prepare(`
+      INSERT INTO records (id, type, title, started_at, tz, participants, source, content_hash)
+      VALUES (@id, @type, @title, @startedAt, @tz, @participants, @source, @contentHash)
+      ON CONFLICT (content_hash) DO NOTHING
+    `);
+    const insertSegment = this.db.prepare(`
+      INSERT INTO segments (record_id, seq, speaker, text, ts) VALUES (?, ?, ?, ?, ?)
+    `);
+    const insertFts = this.db.prepare(`
+      INSERT INTO segments_fts (rowid, text, title, record_id) VALUES (?, ?, ?, ?)
+    `);
+
+    let inserted = 0;
+    for (const record of batch) {
+      const id = record.id ?? crypto.randomUUID();
+      const result = insertRecord.run({
+        id,
+        type: record.type,
+        title: record.title,
+        startedAt: record.startedAt,
+        tz: record.tz,
+        participants: JSON.stringify(record.participants),
+        source: record.source,
+        contentHash: record.contentHash,
+      });
+      // No change means the hash was already there: a duplicate.
+      if (result.changes === 0) continue;
+      inserted += 1;
+      record.segments.forEach((segment, seq) => {
+        const segmentResult = insertSegment.run(id, seq, segment.speaker, segment.text, segment.ts);
+        insertFts.run(segmentResult.lastInsertRowid, segment.text, record.title, id);
+      });
+    }
+    return { inserted, skipped: batch.length - inserted };
   }
 
   /** Every record, newest first. */

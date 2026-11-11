@@ -92,11 +92,56 @@ export function zonedToUtc(local: LocalDateTime, timeZone: string): Date {
   return new Date(instant);
 }
 
-/** The calendar date `days` before today, as seen in `timeZone`. */
-export function daysBefore(now: Date, days: number, timeZone: string): { year: number; month: number; day: number } {
-  const today = partsInZone(now, timeZone);
-  // Date.UTC rolls day 0 or -3 back into the previous month, which is the
-  // calendar arithmetic we want. No time of day is involved, so no DST issue.
-  const date = new Date(Date.UTC(today.year, today.month - 1, today.day - days));
-  return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate() };
+// ---------------------------------------------------------------------------
+// Calendar dates. These carry no time of day, so daylight saving never
+// affects them; the timezone matters only when deciding what "today" is.
+
+/** A day on the calendar. Month is 1 to 12. */
+export interface CalendarDate {
+  year: number;
+  month: number;
+  day: number;
+}
+
+export const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
+export type Weekday = (typeof WEEKDAYS)[number];
+
+/** Today's date as seen in `timeZone`. */
+export function todayIn(now: Date, timeZone: string): CalendarDate {
+  const { year, month, day } = partsInZone(now, timeZone);
+  return { year, month, day };
+}
+
+export function addDays(date: CalendarDate, days: number): CalendarDate {
+  // Date.UTC rolls day 0 or day 35 into the next or previous month, which is
+  // exactly the calendar arithmetic needed.
+  const moved = new Date(Date.UTC(date.year, date.month - 1, date.day + days));
+  return { year: moved.getUTCFullYear(), month: moved.getUTCMonth() + 1, day: moved.getUTCDate() };
+}
+
+/** 0 for Sunday through 6 for Saturday. */
+export function weekdayIndex(date: CalendarDate): number {
+  return new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay();
+}
+
+/** The most recent `weekday` strictly before `today`. On a Monday, the most recent Monday is a week ago. */
+export function mostRecentWeekdayBefore(today: CalendarDate, weekday: Weekday): CalendarDate {
+  const back = (weekdayIndex(today) - WEEKDAYS.indexOf(weekday) + 7) % 7 || 7;
+  return addDays(today, -back);
+}
+
+/**
+ * `weekday` in the week before the current one. Weeks run Monday to Sunday,
+ * so on Wednesday 11 November the previous week is 2 to 8 November.
+ */
+export function weekdayOfPreviousWeek(today: CalendarDate, weekday: Weekday): CalendarDate {
+  const daysSinceMonday = (weekdayIndex(today) + 6) % 7;
+  const daysFromMonday = (WEEKDAYS.indexOf(weekday) + 6) % 7;
+  return addDays(today, -daysSinceMonday - 7 + daysFromMonday);
+}
+
+/** The most recent `month`/`day` strictly before `today`: 3 November means last year's once it is 3 November again. */
+export function mostRecentMonthDayBefore(today: CalendarDate, month: number, day: number): CalendarDate {
+  const reachedThisYear = today.month > month || (today.month === month && today.day > day);
+  return { year: reachedThisYear ? today.year : today.year - 1, month, day };
 }

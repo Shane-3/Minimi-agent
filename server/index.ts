@@ -2,6 +2,7 @@ import http from "node:http";
 import dotenv from "dotenv";
 import express from "express";
 import { createServer as createViteServer } from "vite";
+import { createAgent } from "./agent/loop.ts";
 import { createApi } from "./api.ts";
 import { DATABASE_PATH, SAMPLE_PATH } from "./config.ts";
 import { EnvError, missingKeyMessages, readEnv } from "./env.ts";
@@ -32,7 +33,8 @@ async function main(): Promise<void> {
   const app = express();
   const server = http.createServer(app);
 
-  app.use("/api", createApi({ env, store, samplePath: SAMPLE_PATH }));
+  const agent = env.anthropicKey === null ? null : createAgent({ apiKey: env.anthropicKey, model: env.model });
+  app.use("/api", createApi({ env, store, samplePath: SAMPLE_PATH, agent }));
 
   // Vite runs inside Express so there is one process and one port. Its
   // hot-reload socket shares the same HTTP server for the same reason.

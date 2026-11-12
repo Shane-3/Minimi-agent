@@ -63,3 +63,43 @@ export interface ImportResult {
   /** Plain sentences for the user, e.g. which records were read in an assumed timezone. */
   warnings: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Chat
+
+/** POST /api/chat. Validated on the server with zod. */
+export interface ChatRequest {
+  /** Omitted for a new conversation; the server creates one and returns its id. */
+  threadId?: string;
+  message: string;
+  /** The browser's IANA timezone, e.g. "Asia/Kolkata". */
+  timezone: string;
+}
+
+/** A record an answer drew on, shown as a chip: "Acme renewal call · Thu 5 Nov". */
+export interface MemoryChip {
+  id: string;
+  title: string;
+  type: RecordType;
+  startedAt: string;
+}
+
+/**
+ * Events on the chat stream, sent as `data: <json>` lines. `type` says which.
+ * Sources and checks are added with web search and the grounding check.
+ */
+export type ChatEvent =
+  | { type: "status"; text: string }
+  | { type: "memory"; records: MemoryChip[] }
+  | { type: "delta"; text: string }
+  | { type: "error"; code: string; message: string; retryable: boolean; threadId: string }
+  /** messageId is null when the answer could not be saved. */
+  | { type: "done"; messageId: number | null; threadId: string };
+
+/** One message of a live chat, as GET /api/threads/:id returns it. */
+export interface ThreadMessage {
+  id: number;
+  role: "user" | "assistant";
+  text: string;
+  ts: string | null;
+}

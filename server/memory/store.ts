@@ -184,6 +184,46 @@ export class Store {
     return { inserted, skipped: batch.length - inserted };
   }
 
+  /**
+   * Creates the record for a live chat if it does not exist yet. A live chat
+   * is a record like any other, so later questions can recall it.
+   */
+  ensureLiveChat(chat: { id: string; title: string; startedAt: string; tz: string }): void {
+    guard("save the chat", () => {
+      this.db
+        .prepare(`
+          INSERT INTO records (id, type, title, started_at, tz, participants, source, content_hash)
+          VALUES (@id, 'chat', @title, @startedAt, @tz, '[]', 'live', @contentHash)
+          ON CONFLICT (id) DO NOTHING
+        `)
+        // Live chats are never imported, so the id alone keeps the hash unique.
+        .run({ ...chat, contentHash: `live:${chat.id}` });
+    });
+  }
+
+  /** Adds a message to the end of a record and to the search index. Returns the new segment's id. */
+  appendSegment(recordId: string, segment: NewSegment): number {
+    return guard("save the message", () => {
+      const run = this.db.transaction(() => {
+        const record = this.db.prepare(`SELECT title FROM records WHERE id = ?`).get(recordId) as
+          | { title: string }
+          | undefined;
+        if (record === undefined) throw new StoreError("The chat this message belongs to no longer exists.");
+        const { next } = this.db
+          .prepare(`SELECT COALESCE(MAX(seq) + 1, 0) AS next FROM segments WHERE record_id = ?`)
+          .get(recordId) as { next: number };
+        const result = this.db
+          .prepare(`INSERT INTO segments (record_id, seq, speaker, text, ts) VALUES (?, ?, ?, ?, ?)`)
+          .run(recordId, next, segment.speaker, segment.text, segment.ts);
+        this.db
+          .prepare(`INSERT INTO segments_fts (rowid, text, title, record_id) VALUES (?, ?, ?, ?)`)
+          .run(result.lastInsertRowid, segment.text, record.title, recordId);
+        return Number(result.lastInsertRowid);
+      });
+      return run();
+    });
+  }
+
   /** Every record, newest first. */
   listRecords(): RecordSummary[] {
     return guard("read records", () => {

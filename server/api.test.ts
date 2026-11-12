@@ -34,9 +34,10 @@ describe("API", () => {
     app.use(
       "/api",
       createApi({
-        env: { anthropicKey: "a-key", tavilyKey: null, port: 0 },
+        env: { anthropicKey: "a-key", tavilyKey: null, port: 0, model: "test-model" },
         store,
         samplePath: SAMPLE_PATH,
+        agent: null,
         now: () => now,
       }),
     );

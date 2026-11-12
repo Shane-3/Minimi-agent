@@ -7,16 +7,20 @@ import type { Env } from "./env.ts";
 import { sendError } from "./http.ts";
 import { TOO_LARGE_MESSAGE } from "./memory/importer.ts";
 import type { Store } from "./memory/store.ts";
+import type { Agent } from "./agent/loop.ts";
+import { chatRoutes } from "./routes/chat.ts";
 import { importRoutes } from "./routes/import.ts";
 
 export interface ApiOptions {
   env: Env;
   store: Store;
   samplePath: string;
+  /** Null when ANTHROPIC_API_KEY is not set. */
+  agent: Agent | null;
   now?: () => Date;
 }
 
-export function createApi({ env, store, samplePath, now }: ApiOptions): Router {
+export function createApi({ env, store, samplePath, agent, now }: ApiOptions): Router {
   const api = Router();
   api.use(express.json({ limit: API_BODY_LIMIT }));
 
@@ -26,6 +30,7 @@ export function createApi({ env, store, samplePath, now }: ApiOptions): Router {
   });
 
   api.use(importRoutes({ store, samplePath, now }));
+  api.use(chatRoutes({ store, agent, now }));
 
   // Unknown API paths answer in the shared error shape instead of falling
   // through to Vite, which would return the HTML page.

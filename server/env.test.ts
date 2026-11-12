@@ -4,7 +4,7 @@ import { EnvError, missingKeyMessages, readEnv } from "./env.ts";
 describe("readEnv", () => {
   it("reads both keys and defaults the port", () => {
     const env = readEnv({ ANTHROPIC_API_KEY: "a-key", TAVILY_API_KEY: "t-key" });
-    expect(env).toEqual({ anthropicKey: "a-key", tavilyKey: "t-key", port: 3000 });
+    expect(env).toEqual({ anthropicKey: "a-key", tavilyKey: "t-key", port: 3000, model: "claude-opus-5-5" });
   });
 
   it("treats an unset key as missing", () => {
@@ -17,6 +17,11 @@ describe("readEnv", () => {
     const env = readEnv({ ANTHROPIC_API_KEY: "", TAVILY_API_KEY: "   " });
     expect(env.anthropicKey).toBeNull();
     expect(env.tavilyKey).toBeNull();
+  });
+
+  it("reads a model override, and ignores a blank one", () => {
+    expect(readEnv({ ANTHROPIC_MODEL: "claude-sonnet-5-5" }).model).toBe("claude-sonnet-5-5");
+    expect(readEnv({ ANTHROPIC_MODEL: " " }).model).toBe("claude-opus-5-5");
   });
 
   it("reads a custom port", () => {

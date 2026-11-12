@@ -11,6 +11,20 @@ export const MAX_PARALLEL_SEARCHES = 10;
 export const SEARCH_TIMEOUT_MS = 8_000;
 export const MODEL_TIMEOUT_MS = 60_000;
 export const MODEL_RETRIES = 1;
+/** Wait before the one retry after an overload or server error. */
+export const MODEL_RETRY_DELAY_MS = 1_500;
+
+/** The model, unless ANTHROPIC_MODEL in .env names another. The only place a model id is written. */
+export const DEFAULT_MODEL = "claude-opus-5-5";
+
+/**
+ * Reasoning depth. Thinking cannot be turned off on this model; effort is the
+ * control. "medium" is its default, set here so a change is deliberate.
+ */
+export const MODEL_EFFORT = "medium";
+
+/** Room for thinking plus the answer. Streaming, so a large cap costs nothing unless used. */
+export const MODEL_MAX_TOKENS = 32_000;
 
 /** Tokens of record text the prompt may hold. */
 export const RECORD_CONTEXT_BUDGET_TOKENS = 80_000;

@@ -119,14 +119,28 @@ describe("createAgent", () => {
     expect(calls).toHaveLength(2);
   });
 
-  it("retries a rate limit or used-up quota once too", async () => {
-    vi.useFakeTimers();
-    const rateLimited = new ApiError({ status: 429, message: '{"error":{"status":"RESOURCE_EXHAUSTED"}}' });
+  it("does not retry a per-minute rate limit, which a retry seconds later would hit again", async () => {
+    const rateLimited = new ApiError({
+      status: 429,
+      message: '{"error":{"status":"RESOURCE_EXHAUSTED","details":[{"quotaId":"GenerateRequestsPerMinutePerProjectPerModel-FreeTier"}]}}',
+    });
     const { agent, calls } = agentWith([{ text: ["x"], errorAt: 0, error: rateLimited }, { text: ["ok"] }]);
-    const answer = agent.answer({ ...prompt, onText: () => {} });
-    await vi.advanceTimersByTimeAsync(1_500);
-    expect((await answer).text).toBe("ok");
-    expect(calls).toHaveLength(2);
+    const error = await failure(agent.answer({ ...prompt, onText: () => {} }));
+    expect(error).toMatchObject({ code: "rate_limited", retryable: true });
+    expect(error.message).toBe("Too many questions in the last minute. Wait a moment and press Retry.");
+    expect(calls).toHaveLength(1);
+  });
+
+  it("says the daily limit is used up, without offering a retry", async () => {
+    const exhausted = new ApiError({
+      status: 429,
+      message: '{"error":{"status":"RESOURCE_EXHAUSTED","details":[{"quotaId":"GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]}}',
+    });
+    const { agent, calls } = agentWith([{ text: ["x"], errorAt: 0, error: exhausted }]);
+    const error = await failure(agent.answer({ ...prompt, onText: () => {} }));
+    expect(error).toMatchObject({ code: "quota_exhausted", retryable: false });
+    expect(error.message).toBe("The model's daily limit is used up. Questions will work again tomorrow.");
+    expect(calls).toHaveLength(1);
   });
 
   it("gives up after the one retry, with a retryable error for the user", async () => {

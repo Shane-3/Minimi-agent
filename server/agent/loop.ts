@@ -12,9 +12,13 @@ import {
 import type { Prompt } from "./prompt.ts";
 
 export type AgentErrorCode =
-  /** Overloaded, rate limited, quota used up, server error or network failure, after the retry. */
+  /** Overloaded, server error or network failure, after the retry. */
   | "unavailable"
   | "timeout"
+  /** Too many requests in the last minute. A retry seconds later would fail too, so none is made. */
+  | "rate_limited"
+  /** The key's daily request limit is used up (the free tier allows a few dozen a day). */
+  | "quota_exhausted"
   /** The user pressed Stop or closed the page. */
   | "aborted"
   /** The model's safety filters declined to answer. */
@@ -160,6 +164,7 @@ export function createAgent(options: { apiKey: string; model: string; client?: M
             error instanceof AgentError &&
             error.retryable &&
             error.code !== "aborted" &&
+            error.code !== "rate_limited" &&
             emitted.text === "" &&
             tries < MODEL_RETRIES;
           if (!canRetry) throw error;
@@ -184,9 +189,18 @@ function toAgentError(error: unknown, partialText: string): AgentError {
     if (error.status === 400 || error.status === 404) {
       return new AgentError("bad_request", UNAVAILABLE_MESSAGE, options(false));
     }
+    if (error.status === 429) {
+      // The quota id names the window that ran out, e.g.
+      // GenerateRequestsPerDayPerProjectPerModel-FreeTier. A fixed identifier,
+      // like API_KEY_INVALID above.
+      if (error.message.includes("PerDay")) {
+        return new AgentError("quota_exhausted", "The model's daily limit is used up. Questions will work again tomorrow.", options(false));
+      }
+      return new AgentError("rate_limited", "Too many questions in the last minute. Wait a moment and press Retry.", options(true));
+    }
   }
-  // Rate limits and used-up quota (429), server errors (5xx), network
-  // failures, and anything unexpected: worth one retry, then the user's Retry button.
+  // Server errors (5xx), network failures and anything unexpected: worth one
+  // retry, then the user's Retry button.
   return new AgentError("unavailable", UNAVAILABLE_MESSAGE, options(true));
 }
 

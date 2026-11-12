@@ -9,7 +9,7 @@ The agent keeps a dated record of everything it is given or told: meeting transc
 Each message goes through four steps:
 
 1. **Code finds the memory.** Date phrases ("Monday", "3 November") are resolved in the user's timezone, matching records are looked up, and they are placed in the prompt whole, next to an index of every record that exists.
-2. **One model, one tool.** Claude answers recall questions directly. For anything about the present it calls `web_search`, which fans out one query set per entity, runs them in parallel against Tavily, and returns ranked, dated evidence.
+2. **One model, one tool.** Gemini answers recall questions directly. For anything about the present it calls `web_search`, which fans out one query set per entity, runs them in parallel against Tavily, and returns ranked, dated evidence.
 3. **Code checks the answer.** Every number, date and name must appear in a record or a source, or it is marked unverified.
 4. **The exchange is saved** with a timestamp, so it can be recalled later.
 

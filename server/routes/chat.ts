@@ -14,7 +14,7 @@ import { StoreError, type Store } from "../memory/store.ts";
 
 export interface ChatRouteOptions {
   store: Store;
-  /** Null when ANTHROPIC_API_KEY is not set. */
+  /** Null when GEMINI_API_KEY is not set. */
   agent: Agent | null;
   /** Injected so tests can fix the time. */
   now?: () => Date;
@@ -33,7 +33,7 @@ export function chatRoutes({ store, agent, now = () => new Date() }: ChatRouteOp
     const body = parseBody(chatBody, req.body, res);
     if (body === null) return;
     if (agent === null) {
-      sendError(res, 503, "missing_key", "Add ANTHROPIC_API_KEY to .env and restart the server.");
+      sendError(res, 503, "missing_key", "Add GEMINI_API_KEY to .env and restart the server.");
       return;
     }
 

@@ -14,7 +14,7 @@ Browser (React)                     Express server                        Extern
 │ Chat view    ├───────────────────►│ Chat route      │ History store (SQLite + FTS5)
 ├──────────────┤◄──── SSE stream ───┤                 │  ▲        ▲
 │ Records panel│  GET /api/records  │ Context builder ├──┘        │ save turn
-└──────────────┘                    │ Agent loop      ├───────────┼──────► Anthropic API
+└──────────────┘                    │ Agent loop      ├───────────┼──────► Gemini API   
                                     │ web_search tool ├───────────┼──────► Tavily API
                                     │ Grounding check ├───────────┘
                                     └─────────────────┘
@@ -25,7 +25,7 @@ Browser (React)                     Express server                        Extern
 | Import route | Code | Validate JSON (zod), normalise timestamps, store records, report what was loaded |
 | History store | SQLite | Raw records and segments are the source of truth; FTS5 index for keyword lookup |
 | Context builder | Code | Resolve dates, find the right records, load them whole into the prompt |
-| Agent loop | **The only agent** | One Claude model with one tool. Decides whether to search, then answers |
+| Agent loop | **The only agent** | One Gemini model with one tool. Decides whether to search, then answers |
 | `web_search` tool | Code | Fan out queries, call Tavily in parallel, dedupe, rank, attach dates |
 | Grounding check | Code | Every number, date and name in the answer must appear in a record or a source |
 
@@ -136,7 +136,7 @@ A live conversation is a record of type `chat`; each message is a segment. Its t
 ## 7. Speed
 
 - Recall questions make one model call and no network search.
-- The system prompt and record index are a stable prefix and use prompt caching.
+- The rules and memory form a stable prefix of the system instruction, so the API's automatic prefix caching can reuse them (it applies to prompts of 4,096 tokens or more).
 - Searches run in parallel; each has a timeout so one slow site cannot hold the answer.
 - First status line target: under 1 second. Recall answer starts streaming in 2 to 3 seconds. Multi-entity re-check: 8 to 15 seconds.
 
@@ -144,7 +144,7 @@ A live conversation is a record of type `chat`; each message is a segment. Its t
 
 | Route | Request | Response |
 |---|---|---|
-| `GET /api/health` | | `{ anthropic: boolean, tavily: boolean }` (whether each key is set, never the key) |
+| `GET /api/health` | | `{ gemini: boolean, tavily: boolean }` (whether each key is set, never the key) |
 | `POST /api/import` | `{ content, timezone }`: `content` is the file's raw text | `{ imported, skipped, range: { from, to }, warnings: string[] }` |
 | `POST /api/import/sample` | `{ timezone }` | Same as import. Replaces any earlier copy of the sample |
 | `GET /api/records` | | `[{ id, type, title, startedAt, participants }]` |
@@ -176,9 +176,9 @@ Starting values, kept in one config file and tuned during evals.
 
 ## 10. Stack
 
-TypeScript, Node 22, Express with Vite in middleware mode (one process, one port), React, `@anthropic-ai/sdk`, Tavily over `fetch`, `better-sqlite3`, `chrono-node`, `zod`, Vitest.
+TypeScript, Node 22, Express with Vite in middleware mode (one process, one port), React, `@google/genai` (model `gemini-4-hydrogen`, overridable with `GEMINI_MODEL`), Tavily over `fetch`, `better-sqlite3`, `chrono-node`, `zod`, Vitest.
 
-Keys: `ANTHROPIC_API_KEY`, `TAVILY_API_KEY`.
+Keys: `GEMINI_API_KEY`, `TAVILY_API_KEY`.
 
 ## 11. Repo layout
 

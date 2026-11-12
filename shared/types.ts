@@ -2,7 +2,7 @@
 
 /** Whether each key is set. The keys themselves never leave the server. */
 export interface Health {
-  anthropic: boolean;
+  gemini: boolean;
   tavily: boolean;
 }
 

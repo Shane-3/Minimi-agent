@@ -3,25 +3,25 @@ import { EnvError, missingKeyMessages, readEnv } from "./env.ts";
 
 describe("readEnv", () => {
   it("reads both keys and defaults the port", () => {
-    const env = readEnv({ ANTHROPIC_API_KEY: "a-key", TAVILY_API_KEY: "t-key" });
-    expect(env).toEqual({ anthropicKey: "a-key", tavilyKey: "t-key", port: 3000, model: "claude-opus-5-5" });
+    const env = readEnv({ GEMINI_API_KEY: "a-key", TAVILY_API_KEY: "t-key" });
+    expect(env).toEqual({ geminiKey: "a-key", tavilyKey: "t-key", port: 3000, model: "gemini-4-hydrogen" });
   });
 
   it("treats an unset key as missing", () => {
     const env = readEnv({ TAVILY_API_KEY: "t-key" });
-    expect(env.anthropicKey).toBeNull();
+    expect(env.geminiKey).toBeNull();
     expect(env.tavilyKey).toBe("t-key");
   });
 
   it("treats a blank key as missing", () => {
-    const env = readEnv({ ANTHROPIC_API_KEY: "", TAVILY_API_KEY: "   " });
-    expect(env.anthropicKey).toBeNull();
+    const env = readEnv({ GEMINI_API_KEY: "", TAVILY_API_KEY: "   " });
+    expect(env.geminiKey).toBeNull();
     expect(env.tavilyKey).toBeNull();
   });
 
   it("reads a model override, and ignores a blank one", () => {
-    expect(readEnv({ ANTHROPIC_MODEL: "claude-sonnet-5-5" }).model).toBe("claude-sonnet-5-5");
-    expect(readEnv({ ANTHROPIC_MODEL: " " }).model).toBe("claude-opus-5-5");
+    expect(readEnv({ GEMINI_MODEL: "gemini-4-argon" }).model).toBe("gemini-4-argon");
+    expect(readEnv({ GEMINI_MODEL: " " }).model).toBe("gemini-4-hydrogen");
   });
 
   it("reads a custom port", () => {
@@ -35,18 +35,18 @@ describe("readEnv", () => {
 
 describe("missingKeyMessages", () => {
   it("is empty when both keys are set", () => {
-    const env = readEnv({ ANTHROPIC_API_KEY: "a-key", TAVILY_API_KEY: "t-key" });
+    const env = readEnv({ GEMINI_API_KEY: "a-key", TAVILY_API_KEY: "t-key" });
     expect(missingKeyMessages(env)).toEqual([]);
   });
 
-  it("names the Anthropic key when it is missing", () => {
+  it("names the Gemini key when it is missing", () => {
     const messages = missingKeyMessages(readEnv({ TAVILY_API_KEY: "t-key" }));
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("ANTHROPIC_API_KEY");
+    expect(messages[0]).toContain("GEMINI_API_KEY");
   });
 
   it("names the Tavily key when it is missing", () => {
-    const messages = missingKeyMessages(readEnv({ ANTHROPIC_API_KEY: "a-key" }));
+    const messages = missingKeyMessages(readEnv({ GEMINI_API_KEY: "a-key" }));
     expect(messages).toHaveLength(1);
     expect(messages[0]).toContain("TAVILY_API_KEY");
   });

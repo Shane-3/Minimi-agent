@@ -1,14 +1,16 @@
 // Builds what the model reads: fixed rules, the memory (record index and
 // loaded records), and for each question the facts code has already worked
 // out (today's date, what the date phrases mean, which records match).
-import type Anthropic from "@anthropic-ai/sdk";
+import type { Content } from "@google/genai";
 import type { MemoryRecord, ThreadMessage } from "../../shared/types.ts";
 import { formatDay, partsInZone, todayIn, type CalendarDate } from "../memory/dates.ts";
 import type { DateFinding, Retrieval } from "../memory/retrieve.ts";
 
 export interface Prompt {
-  system: Anthropic.Beta.BetaTextBlockParam[];
-  messages: Anthropic.Beta.BetaMessageParam[];
+  /** The rules, then the memory: the part that stays the same between questions. */
+  system: string;
+  /** Earlier turns of this conversation, then the new question with its context. */
+  contents: Content[];
 }
 
 export interface PromptInput {
@@ -59,24 +61,21 @@ export function buildPrompt({ retrieval, question, history, timezone, now }: Pro
   const today = todayIn(now, timezone);
   const memory = renderMemory(retrieval, timezone, today);
 
-  const messages: Anthropic.Beta.BetaMessageParam[] = history.map((message) => ({
-    role: message.role,
-    content: message.text,
+  // Earlier turns are replayed as plain text, as they are stored. Gemini
+  // calls the assistant's role "model".
+  const contents: Content[] = history.map((message) => ({
+    role: message.role === "assistant" ? "model" : "user",
+    parts: [{ text: message.text }],
   }));
-  messages.push({
+  contents.push({
     role: "user",
-    content: `${renderTurnContext(retrieval, timezone, now, today)}\n\n<question>\n${question}\n</question>`,
+    parts: [{ text: `${renderTurnContext(retrieval, timezone, now, today)}\n\n<question>\n${question}\n</question>` }],
   });
 
-  return {
-    system: [
-      { type: "text", text: RULES },
-      // The memory changes only when records change, so it is cached together
-      // with the rules. Everything that varies per question is in the user turn.
-      { type: "text", text: memory, cache_control: { type: "ephemeral" } },
-    ],
-    messages,
-  };
+  // The memory changes only when records change, so rules plus memory form a
+  // prefix the API can cache between questions. Everything that varies per
+  // question is in the user turn.
+  return { system: `${RULES}\n\n${memory}`, contents };
 }
 
 // ---------------------------------------------------------------------------

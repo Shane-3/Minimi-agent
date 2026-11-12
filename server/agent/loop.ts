@@ -1,23 +1,23 @@
-// The agent loop: the only file that calls Anthropic. One model, written by
+// The agent loop: the only file that calls Gemini. One model, written by
 // hand, no framework. In this version the model has no tools, so a turn is a
 // single streamed call; web_search is added to this loop in build step 7.
-import Anthropic from "@anthropic-ai/sdk";
+import { ApiError, FinishReason, GoogleGenAI, ThinkingLevel } from "@google/genai";
 import {
-  MODEL_EFFORT,
   MODEL_MAX_TOKENS,
   MODEL_RETRIES,
   MODEL_RETRY_DELAY_MS,
+  MODEL_THINKING_LEVEL,
   MODEL_TIMEOUT_MS,
 } from "../config.ts";
 import type { Prompt } from "./prompt.ts";
 
 export type AgentErrorCode =
-  /** Overloaded, rate limited, server error or network failure, after the retry. */
+  /** Overloaded, rate limited, quota used up, server error or network failure, after the retry. */
   | "unavailable"
   | "timeout"
   /** The user pressed Stop or closed the page. */
   | "aborted"
-  /** The model and its fallback declined to answer. */
+  /** The model's safety filters declined to answer. */
   | "refusal"
   /** The key is missing or rejected. */
   | "auth"
@@ -49,8 +49,8 @@ export interface AnswerRequest extends Prompt {
 export interface AnswerResult {
   text: string;
   /** "max_tokens" means the answer was cut off. */
-  stopReason: string | null;
-  /** The model that wrote the answer: differs from the configured one after a refusal fallback. */
+  stopReason: "end_turn" | "max_tokens";
+  /** The model version that wrote the answer, as the API reports it. */
   model: string;
 }
 
@@ -58,19 +58,30 @@ export interface Agent {
   answer(request: AnswerRequest): Promise<AnswerResult>;
 }
 
-/**
- * Server-side refusal fallback: if the model declines, the API re-runs the
- * same request on a fallback model it picks by refusal category, inside the
- * same call, so the user gets an answer instead of a bare refusal.
- */
-const FALLBACK_BETA = "server-side-fallback-2026-07-01";
+/** The one part of the SDK the loop uses, so tests can stand in for it. */
+export type ModelClient = Pick<GoogleGenAI, "models">;
+
+// Finish reasons where the model's filters stopped the answer.
+const DECLINED = new Set<FinishReason | undefined>([
+  FinishReason.SAFETY,
+  FinishReason.RECITATION,
+  FinishReason.BLOCKLIST,
+  FinishReason.PROHIBITED_CONTENT,
+  FinishReason.SPII,
+]);
 
 const UNAVAILABLE_MESSAGE = "The answer didn't come through. Your message is saved.";
 
-export function createAgent(options: { apiKey: string; model: string; client?: Anthropic }): Agent {
-  // Retries are done below, not by the SDK, so there is exactly one and only
-  // before any text has reached the user (a retry after that would repeat it).
-  const client = options.client ?? new Anthropic({ apiKey: options.apiKey, maxRetries: 0, timeout: MODEL_TIMEOUT_MS });
+export function createAgent(options: { apiKey: string; model: string; client?: ModelClient }): Agent {
+  // The SDK's own retries are turned off (it would try 5 times). The single
+  // retry below happens only before any text has reached the user, since a
+  // retry after that would repeat what they already saw.
+  const client =
+    options.client ??
+    new GoogleGenAI({
+      apiKey: options.apiKey,
+      httpOptions: { timeout: MODEL_TIMEOUT_MS, retryOptions: { attempts: 1 } },
+    });
 
   async function attempt(request: AnswerRequest, emitted: { text: string }): Promise<AnswerResult> {
     const controller = new AbortController();
@@ -86,34 +97,43 @@ export function createAgent(options: { apiKey: string; model: string; client?: A
     if (request.signal?.aborted === true) controller.abort();
 
     try {
-      const stream = client.beta.messages.stream(
-        {
-          model: options.model,
-          max_tokens: MODEL_MAX_TOKENS,
-          system: request.system,
-          messages: request.messages,
-          output_config: { effort: MODEL_EFFORT },
-          betas: [FALLBACK_BETA],
-          fallbacks: "default",
+      const stream = await client.models.generateContentStream({
+        model: options.model,
+        contents: request.contents,
+        config: {
+          // Rules and memory first and unchanged between questions, so the
+          // API's automatic prefix caching can reuse them.
+          systemInstruction: request.system,
+          maxOutputTokens: MODEL_MAX_TOKENS,
+          thinkingConfig: { thinkingLevel: ThinkingLevel[MODEL_THINKING_LEVEL] },
+          abortSignal: controller.signal,
         },
-        { signal: controller.signal },
-      );
+      });
 
-      for await (const event of stream) {
-        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-          emitted.text += event.delta.text;
-          request.onText(event.delta.text);
+      let finishReason: FinishReason | undefined;
+      let blocked = false;
+      let model = options.model;
+      for await (const chunk of stream) {
+        if (chunk.promptFeedback?.blockReason !== undefined) blocked = true;
+        model = chunk.modelVersion ?? model;
+        const candidate = chunk.candidates?.[0];
+        finishReason = candidate?.finishReason ?? finishReason;
+        for (const part of candidate?.content?.parts ?? []) {
+          // Thought parts are the model's reasoning, not the answer.
+          if (part.thought === true || part.text === undefined || part.text === "") continue;
+          emitted.text += part.text;
+          request.onText(part.text);
         }
       }
 
-      const final = await stream.finalMessage();
-      if (final.stop_reason === "refusal") {
+      if (blocked || DECLINED.has(finishReason)) {
         throw new AgentError("refusal", "This question can't be answered here.", {
           retryable: false,
           partialText: emitted.text,
         });
       }
-      return { text: emitted.text, stopReason: final.stop_reason, model: final.model };
+      const stopReason = finishReason === FinishReason.MAX_TOKENS ? "max_tokens" : "end_turn";
+      return { text: emitted.text, stopReason, model };
     } catch (error) {
       if (error instanceof AgentError) throw error;
       if (request.signal?.aborted === true) {
@@ -150,20 +170,23 @@ export function createAgent(options: { apiKey: string; model: string; client?: A
   };
 }
 
-// Most specific first, so retryable failures stay apart from ones a retry cannot fix.
+// Sorts failures into ones a retry may fix and ones it cannot.
 function toAgentError(error: unknown, partialText: string): AgentError {
   const options = (retryable: boolean) => ({ retryable, partialText, cause: error });
-  if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
-    return new AgentError("auth", "The Anthropic API key was rejected. Check ANTHROPIC_API_KEY in .env.", options(false));
+  if (error instanceof ApiError) {
+    // The Gemini API answers a bad key with 400 and the reason code
+    // API_KEY_INVALID, so the status alone cannot tell it from a malformed
+    // request. The code is a fixed identifier, not wording that may change.
+    const badKey = error.status === 400 && error.message.includes("API_KEY_INVALID");
+    if (badKey || error.status === 401 || error.status === 403) {
+      return new AgentError("auth", "The Gemini API key was rejected. Check GEMINI_API_KEY in .env.", options(false));
+    }
+    if (error.status === 400 || error.status === 404) {
+      return new AgentError("bad_request", UNAVAILABLE_MESSAGE, options(false));
+    }
   }
-  if (error instanceof Anthropic.BadRequestError || error instanceof Anthropic.NotFoundError) {
-    return new AgentError("bad_request", UNAVAILABLE_MESSAGE, options(false));
-  }
-  if (error instanceof Anthropic.APIConnectionTimeoutError) {
-    return new AgentError("timeout", UNAVAILABLE_MESSAGE, options(true));
-  }
-  // Rate limits, overload (529), other server errors and network failures,
-  // and anything unexpected: worth one retry, then the user's Retry button.
+  // Rate limits and used-up quota (429), server errors (5xx), network
+  // failures, and anything unexpected: worth one retry, then the user's Retry button.
   return new AgentError("unavailable", UNAVAILABLE_MESSAGE, options(true));
 }
 

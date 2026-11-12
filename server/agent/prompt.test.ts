@@ -25,27 +25,21 @@ function promptFor(question: string, budgetTokens?: number) {
   return buildPrompt({ retrieval, question, history: [], timezone: KOLKATA, now: NOW });
 }
 
-const memoryOf = (prompt: ReturnType<typeof promptFor>) => prompt.system[1]?.text ?? "";
-const turnOf = (prompt: ReturnType<typeof promptFor>) => {
-  const last = prompt.messages.at(-1);
-  return typeof last?.content === "string" ? last.content : "";
-};
+// The system instruction is the rules, a blank line, then the memory.
+const memoryOf = (prompt: ReturnType<typeof promptFor>) => prompt.system.slice(`${RULES}\n\n`.length);
+const turnOf = (prompt: ReturnType<typeof promptFor>) => prompt.contents.at(-1)?.parts?.[0]?.text ?? "";
 
 describe("buildPrompt: system", () => {
-  it("puts the fixed rules first and caches them together with the memory", () => {
-    store.close();
-    store = new Store(":memory:");
+  it("puts the fixed rules first, then the memory", () => {
     loadSampleInto(store, prepareSample(sample, KOLKATA, NOW), KOLKATA);
     const prompt = promptFor("What did we decide?");
-    expect(prompt.system[0]).toEqual({ type: "text", text: RULES });
-    expect(prompt.system[0]).not.toHaveProperty("cache_control");
-    expect(prompt.system[1]?.cache_control).toEqual({ type: "ephemeral" });
+    expect(prompt.system.startsWith(`${RULES}\n\n<memory>`)).toBe(true);
   });
 
-  it("keeps the memory identical for different questions, so the cache is reused", () => {
+  it("keeps the system instruction identical for different questions, so its cached prefix is reused", () => {
     loadSampleInto(store, prepareSample(sample, KOLKATA, NOW), KOLKATA);
-    expect(memoryOf(promptFor("On Monday we shortlisted 5 CRM tools"))).toBe(
-      memoryOf(promptFor("What did we decide about the Acme discount?")),
+    expect(promptFor("On Monday we shortlisted 5 CRM tools").system).toBe(
+      promptFor("What did we decide about the Acme discount?").system,
     );
   });
 
@@ -167,7 +161,8 @@ describe("buildPrompt: conversation history", () => {
       timezone: KOLKATA,
       now: NOW,
     });
-    expect(prompt.messages.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
-    expect(prompt.messages[1]?.content).toBe("The shortlist is five tools.");
+    // Gemini's name for the assistant's turns is "model".
+    expect(prompt.contents.map((content) => content.role)).toEqual(["user", "model", "user"]);
+    expect(prompt.contents[1]?.parts).toEqual([{ text: "The shortlist is five tools." }]);
   });
 });

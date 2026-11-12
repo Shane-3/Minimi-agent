@@ -19,11 +19,11 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 async function main(): Promise<void> {
   dotenv.config({ override: true, quiet: true });
   const env = readEnv(process.env);
-  if (env.anthropicKey === null) {
-    console.error("Add ANTHROPIC_API_KEY to .env to run the evals. They make real model calls.");
+  if (env.geminiKey === null) {
+    console.error("Add GEMINI_API_KEY to .env to run the evals. They make real model calls.");
     process.exit(1);
   }
-  const agent = createAgent({ apiKey: env.anthropicKey, model: env.model });
+  const agent = createAgent({ apiKey: env.geminiKey, model: env.model });
 
   const now = new Date();
   const store = new Store(":memory:");

@@ -33,7 +33,7 @@ async function main(): Promise<void> {
   const app = express();
   const server = http.createServer(app);
 
-  const agent = env.anthropicKey === null ? null : createAgent({ apiKey: env.anthropicKey, model: env.model });
+  const agent = env.geminiKey === null ? null : createAgent({ apiKey: env.geminiKey, model: env.model });
   app.use("/api", createApi({ env, store, samplePath: SAMPLE_PATH, agent }));
 
   // Vite runs inside Express so there is one process and one port. Its

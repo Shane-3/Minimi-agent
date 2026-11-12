@@ -14,17 +14,21 @@ export const MODEL_RETRIES = 1;
 /** Wait before the one retry after an overload or server error. */
 export const MODEL_RETRY_DELAY_MS = 1_500;
 
-/** The model, unless ANTHROPIC_MODEL in .env names another. The only place a model id is written. */
-export const DEFAULT_MODEL = "claude-opus-5-5";
+/** The model, unless GEMINI_MODEL in .env names another. The only place a model id is written. */
+export const DEFAULT_MODEL = "gemini-4-hydrogen";
 
 /**
- * Reasoning depth. Thinking cannot be turned off on this model; effort is the
- * control. "medium" is its default, set here so a change is deliberate.
+ * Reasoning depth. The model's default is HIGH; Google recommends MEDIUM for
+ * responsive chat, and recall answers read records already in the prompt.
+ * Tuned against the evals.
  */
-export const MODEL_EFFORT = "medium";
+export const MODEL_THINKING_LEVEL: "LOW" | "MEDIUM" | "HIGH" = "MEDIUM";
 
-/** Room for thinking plus the answer. Streaming, so a large cap costs nothing unless used. */
-export const MODEL_MAX_TOKENS = 32_000;
+/**
+ * Caps thinking and answer together, so it must not be low or answers get cut
+ * off. 65,536 is the model's single-request maximum.
+ */
+export const MODEL_MAX_TOKENS = 65_536;
 
 /** Tokens of record text the prompt may hold. */
 export const RECORD_CONTEXT_BUDGET_TOKENS = 80_000;

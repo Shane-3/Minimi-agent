@@ -3,10 +3,10 @@ import { DEFAULT_MODEL } from "./config.ts";
 
 export interface Env {
   /** null when the key is not set. */
-  anthropicKey: string | null;
+  geminiKey: string | null;
   tavilyKey: string | null;
   port: number;
-  /** Claude model id. Not a key: it has a default and only changes for testing. */
+  /** Gemini model id. Not a key: it has a default and only changes for testing. */
   model: string;
 }
 
@@ -18,10 +18,10 @@ export class EnvError extends Error {
 }
 
 const schema = z.object({
-  ANTHROPIC_API_KEY: z.string().optional(),
+  GEMINI_API_KEY: z.string().optional(),
   TAVILY_API_KEY: z.string().optional(),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  ANTHROPIC_MODEL: z.string().optional(),
+  GEMINI_MODEL: z.string().optional(),
 });
 
 // A key left blank in a copied .env.example counts as missing.
@@ -36,10 +36,10 @@ export function readEnv(source: NodeJS.ProcessEnv): Env {
     throw new EnvError("PORT in .env must be a whole number between 1 and 65535.");
   }
   return {
-    anthropicKey: keyOrNull(parsed.data.ANTHROPIC_API_KEY),
+    geminiKey: keyOrNull(parsed.data.GEMINI_API_KEY),
     tavilyKey: keyOrNull(parsed.data.TAVILY_API_KEY),
     port: parsed.data.PORT,
-    model: keyOrNull(parsed.data.ANTHROPIC_MODEL) ?? DEFAULT_MODEL,
+    model: keyOrNull(parsed.data.GEMINI_MODEL) ?? DEFAULT_MODEL,
   };
 }
 
@@ -47,8 +47,8 @@ export function readEnv(source: NodeJS.ProcessEnv): Env {
 // and recall still works without the Tavily key.
 export function missingKeyMessages(env: Env): string[] {
   const messages: string[] = [];
-  if (env.anthropicKey === null) {
-    messages.push("Add ANTHROPIC_API_KEY to .env and restart the server.");
+  if (env.geminiKey === null) {
+    messages.push("Add GEMINI_API_KEY to .env and restart the server.");
   }
   if (env.tavilyKey === null) {
     messages.push(

@@ -13,7 +13,9 @@ const KOLKATA = "Asia/Kolkata";
 const NOW = new Date("2026-11-11T06:00:00Z");
 
 /** A stand-in agent that records each request and plays a scripted reply. */
-function fakeAgent(reply: (request: AnswerRequest) => Promise<{ text: string; stopReason?: string }>) {
+function fakeAgent(
+  reply: (request: AnswerRequest) => Promise<{ text: string; stopReason?: "end_turn" | "max_tokens" }>,
+) {
   const requests: AnswerRequest[] = [];
   const agent: Agent = {
     async answer(request) {
@@ -41,7 +43,7 @@ async function start(agent: Agent | null): Promise<void> {
   app.use(
     "/api",
     createApi({
-      env: { anthropicKey: agent === null ? null : "a-key", tavilyKey: null, port: 0, model: "test-model" },
+      env: { geminiKey: agent === null ? null : "a-key", tavilyKey: null, port: 0, model: "test-model" },
       store,
       samplePath: SAMPLE_PATH,
       agent,
@@ -114,10 +116,10 @@ describe("POST /api/chat", () => {
 
     await ask({ message: "And who owns the next step?", threadId });
     const second = requests[1]!;
-    expect(second.messages.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
-    expect(second.messages[0]?.content).toBe("What did we decide about Acme?");
+    expect(second.contents.map((content) => content.role)).toEqual(["user", "model", "user"]);
+    expect(second.contents[0]?.parts).toEqual([{ text: "What did we decide about Acme?" }]);
     // Its own messages are already in the conversation, so not repeated as a record.
-    expect(second.system[1]?.text).not.toContain("What did we decide about Acme?");
+    expect(second.system).not.toContain("What did we decide about Acme?");
   });
 
   it("recalls a different, earlier conversation as a record", async () => {
@@ -125,7 +127,7 @@ describe("POST /api/chat", () => {
     await start(agent);
     await ask({ message: "What does the zebra crossing project need?" });
     await ask({ message: "What did I ask about the zebra crossing?" });
-    expect(requests[1]?.system[1]?.text).toContain("User: What does the zebra crossing project need?");
+    expect(requests[1]?.system).toContain("User: What does the zebra crossing project need?");
   });
 
   it("keeps the question when the answer fails, and says so with a retry", async () => {
@@ -190,13 +192,13 @@ describe("POST /api/chat", () => {
     expect(store.getRecord(imported.id)?.segments).toHaveLength(1);
   });
 
-  it("answers 503 with the setup message when the Anthropic key is missing", async () => {
+  it("answers 503 with the setup message when the Gemini key is missing", async () => {
     await start(null);
     const response = await post("/chat", { timezone: KOLKATA, message: "Hi" });
     expect(response.status).toBe(503);
     expect(((await response.json()) as ApiError).error).toEqual({
       code: "missing_key",
-      message: "Add ANTHROPIC_API_KEY to .env and restart the server.",
+      message: "Add GEMINI_API_KEY to .env and restart the server.",
     });
   });
 

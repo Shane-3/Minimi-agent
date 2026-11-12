@@ -15,13 +15,17 @@ export function lacks(name: string, pattern: RegExp): Check {
   return { name, pass: (answer) => !pattern.test(answer) };
 }
 
-/** `first` appears, `second` appears, and `first` comes before `second`. */
+/**
+ * Both appear, and `first` is mentioned before the last mention of `second`.
+ * The last mention, because a correct timeline may open by naming the latest
+ * day ("the latest was on 5 Nov") before listing the days oldest first.
+ */
 export function inOrder(name: string, first: string, second: string): Check {
   return {
     name,
     pass: (answer) => {
       const a = answer.indexOf(first);
-      const b = answer.indexOf(second);
+      const b = answer.lastIndexOf(second);
       return a !== -1 && b !== -1 && a < b;
     },
   };

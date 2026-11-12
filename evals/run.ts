@@ -3,7 +3,8 @@
 // through the same retrieval, prompt and loop the chat route uses.
 import { readFileSync } from "node:fs";
 import dotenv from "dotenv";
-import { createAgent } from "../server/agent/loop.ts";
+import { ApiError } from "@google/genai";
+import { AgentError, createAgent } from "../server/agent/loop.ts";
 import { buildPrompt } from "../server/agent/prompt.ts";
 import { SAMPLE_PATH } from "../server/config.ts";
 import { readEnv } from "../server/env.ts";
@@ -41,17 +42,32 @@ async function main(): Promise<void> {
     const retrieval = retrieve(store, evalCase.question, { timezone: TIMEZONE, now: asked });
     const prompt = buildPrompt({ retrieval, question: evalCase.question, history: [], timezone: TIMEZONE, now: asked });
 
-    const started = performance.now();
+    let started = performance.now();
     let firstText: number | null = null;
     let answer: string;
-    try {
+    const ask = async () => {
+      started = performance.now();
+      firstText = null;
       const result = await agent.answer({
         ...prompt,
         onText: () => {
           firstText ??= performance.now();
         },
       });
-      answer = result.text;
+      return result.text;
+    };
+    try {
+      try {
+        answer = await ask();
+      } catch (error) {
+        // The free tier allows a few requests per minute. Running seven cases
+        // back to back can hit that, which says nothing about the answers, so
+        // wait out the minute and ask again once. Timings are of the second try.
+        if (!isRateLimit(error)) throw error;
+        console.log(`     ${evalCase.id}. rate limited; waiting ${RATE_LIMIT_WAIT_MS / 1000}s and asking again`);
+        await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_WAIT_MS));
+        answer = await ask();
+      }
     } catch (error) {
       failed += 1;
       // The cause is the SDK's own error (status and API message), which the
@@ -78,6 +94,12 @@ async function main(): Promise<void> {
   store.close();
   console.log(`\n${cases.length - failed} of ${cases.length} passed`);
   process.exit(failed === 0 ? 0 : 1);
+}
+
+const RATE_LIMIT_WAIT_MS = 60_000;
+
+function isRateLimit(error: unknown): boolean {
+  return error instanceof AgentError && error.cause instanceof ApiError && error.cause.status === 429;
 }
 
 function evalContext(store: Store, now: Date): EvalContext {

@@ -3,7 +3,6 @@
 // through the same retrieval, prompt and loop the chat route uses.
 import { readFileSync } from "node:fs";
 import dotenv from "dotenv";
-import { ApiError } from "@google/genai";
 import { AgentError, createAgent } from "../server/agent/loop.ts";
 import { buildPrompt } from "../server/agent/prompt.ts";
 import { SAMPLE_PATH } from "../server/config.ts";
@@ -37,7 +36,10 @@ async function main(): Promise<void> {
 
   console.log(`Model ${env.model}, sample loaded as of ${formatDay(todayIn(now, TIMEZONE), todayIn(now, TIMEZONE))} (${TIMEZONE})\n`);
   let failed = 0;
-  for (const evalCase of cases) {
+  for (const [index, evalCase] of cases.entries()) {
+    // The free tier allows 5 requests a minute; spacing the calls keeps a run
+    // of seven inside that.
+    if (index > 0) await new Promise((resolve) => setTimeout(resolve, CALL_GAP_MS));
     const asked = new Date();
     const retrieval = retrieve(store, evalCase.question, { timezone: TIMEZONE, now: asked });
     const prompt = buildPrompt({ retrieval, question: evalCase.question, history: [], timezone: TIMEZONE, now: asked });
@@ -60,10 +62,16 @@ async function main(): Promise<void> {
       try {
         answer = await ask();
       } catch (error) {
-        // The free tier allows a few requests per minute. Running seven cases
-        // back to back can hit that, which says nothing about the answers, so
-        // wait out the minute and ask again once. Timings are of the second try.
-        if (!isRateLimit(error)) throw error;
+        // Out of requests for the day: every later case would fail the same
+        // way and say nothing about the answers, so stop here.
+        if (error instanceof AgentError && error.code === "quota_exhausted") {
+          console.log(`STOP at case ${evalCase.id}: ${error.message}`);
+          store.close();
+          process.exit(1);
+        }
+        // Hitting the per-minute limit says nothing about the answers either,
+        // so wait out the minute and ask again once. Timings are of the second try.
+        if (!(error instanceof AgentError && error.code === "rate_limited")) throw error;
         console.log(`     ${evalCase.id}. rate limited; waiting ${RATE_LIMIT_WAIT_MS / 1000}s and asking again`);
         await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_WAIT_MS));
         answer = await ask();
@@ -97,10 +105,7 @@ async function main(): Promise<void> {
 }
 
 const RATE_LIMIT_WAIT_MS = 60_000;
-
-function isRateLimit(error: unknown): boolean {
-  return error instanceof AgentError && error.cause instanceof ApiError && error.cause.status === 429;
-}
+const CALL_GAP_MS = 13_000;
 
 function evalContext(store: Store, now: Date): EvalContext {
   const today = todayIn(now, TIMEZONE);

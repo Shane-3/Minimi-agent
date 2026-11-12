@@ -125,7 +125,14 @@ function evalContext(store: Store, now: Date): EvalContext {
   const recordsText = records
     .map((summary) => store.getRecord(summary.id)?.segments.map((segment) => segment.text).join("\n") ?? "")
     .join("\n");
-  return { dayOf, emptyDayBeforeRange: `${empty.day} ${MONTHS[empty.month - 1]}`, recordsText };
+  // listRecords is newest first.
+  return {
+    dayOf,
+    emptyDayBeforeRange: `${empty.day} ${MONTHS[empty.month - 1]}`,
+    rangeFrom: dayOf(first.id),
+    rangeTo: dayOf(records[0]!.id),
+    recordsText,
+  };
 }
 
 main().catch((error: unknown) => {

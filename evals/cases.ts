@@ -8,6 +8,9 @@ export interface EvalContext {
   dayOf(recordId: string): string;
   /** "24 October": a day before the first record, with nothing on it. */
   emptyDayBeforeRange: string;
+  /** "3 Nov" style labels of the first and last record's day. Which records those are depends on the weekday the sample was loaded. */
+  rangeFrom: string;
+  rangeTo: string;
   /** All record text, for checking that numbers come from the records. */
   recordsText: string;
 }
@@ -98,8 +101,8 @@ export function evalCases(context: EvalContext): EvalCase[] {
       question: `What did we discuss on ${context.emptyDayBeforeRange}?`,
       checks: [
         contains("says there is no record", NO_RECORD),
-        contains("states where the range starts", new RegExp(context.dayOf("sample-acme-kickoff"))),
-        contains("states where the range ends", new RegExp(context.dayOf("sample-crm-shortlist"))),
+        contains("states where the range starts", new RegExp(context.rangeFrom)),
+        contains("states where the range ends", new RegExp(context.rangeTo)),
       ],
     },
     {

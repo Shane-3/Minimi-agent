@@ -282,10 +282,31 @@ describe("createAgent with a pool of models", () => {
     expect(calls.map(modelOf)).toEqual(["best", "second"]);
   });
 
-  it("gives an overload only one more try, even with models to spare", async () => {
-    const { agent, calls } = agentWith([failsWith(overloaded()), failsWith(overloaded())], POOL);
-    expect(await failure(agent.answer({ ...prompt, onText: () => {} }))).toMatchObject({ code: "unavailable" });
-    expect(calls).toHaveLength(2);
+  it("moves past every overloaded model, since an overload fails fast", async () => {
+    const { agent, calls } = agentWith([failsWith(overloaded()), failsWith(overloaded()), { text: ["ok"] }], POOL);
+    expect((await agent.answer({ ...prompt, onText: () => {} })).text).toBe("ok");
+    expect(calls.map(modelOf)).toEqual(["best", "second", "third"]);
+  });
+
+  it("gives up when every model is overloaded, after one more try on the last", async () => {
+    vi.useFakeTimers();
+    const { agent, calls } = agentWith(
+      [failsWith(overloaded()), failsWith(overloaded()), failsWith(overloaded()), failsWith(overloaded())],
+      POOL,
+    );
+    const answer = failure(agent.answer({ ...prompt, onText: () => {} }));
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(await answer).toMatchObject({ code: "unavailable", retryable: true });
+    expect(calls.map(modelOf)).toEqual(["best", "second", "third", "third"]);
+  });
+
+  it("gives a timeout only one more try, since each costs a minute", async () => {
+    vi.useFakeTimers();
+    const { agent, calls } = agentWith([{ hang: true }, { hang: true }, { text: ["ok"] }], POOL);
+    const answer = failure(agent.answer({ ...prompt, onText: () => {} }));
+    await vi.advanceTimersByTimeAsync(60_000 * 2);
+    expect(await answer).toMatchObject({ code: "timeout" });
+    expect(calls.map(modelOf)).toEqual(["best", "second"]);
   });
 
   it("does not change model once text has reached the user", async () => {

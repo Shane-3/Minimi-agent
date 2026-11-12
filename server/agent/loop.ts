@@ -190,8 +190,16 @@ export function createAgent(options: { apiKey: string; models: string[]; client?
             continue;
           }
 
-          // Overload, server errors and timeouts get one more try in all
-          // (REQUIREMENTS §5): on another model if there is one, otherwise on
+          // An overload or server error fails within a second, so like a
+          // limit it moves straight on while another model is free.
+          if (error.code === "unavailable" && pool.pick(model) !== null) {
+            pool.rest(model, "failure", MODEL_REST_AFTER_FAILURE_MS);
+            continue;
+          }
+
+          // A timeout costs a whole minute, and an overload with no other
+          // model free has nowhere to go: those get one more try in all
+          // (REQUIREMENTS §5), on another model if there is one, otherwise on
           // the same model after a short wait.
           if ((error.code === "unavailable" || error.code === "timeout") && failureRetries < MODEL_RETRIES) {
             failureRetries += 1;

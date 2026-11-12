@@ -14,8 +14,27 @@ export const MODEL_RETRIES = 1;
 /** Wait before the one retry after an overload or server error. */
 export const MODEL_RETRY_DELAY_MS = 1_500;
 
-/** The model, unless GEMINI_MODEL in .env names another. The only place a model id is written. */
-export const DEFAULT_MODEL = "gemini-4-hydrogen";
+/**
+ * Models to answer with, best first: the only place model ids are written.
+ * GEMINI_MODELS in .env replaces the list. Free-tier limits are counted per
+ * model, so when one hits its limit, or is overloaded, the answer moves to
+ * the next. All five are stable and on the free tier; the later ones are
+ * faster but less consistent.
+ */
+export const DEFAULT_MODELS = [
+  "gemini-4-hydrogen",
+  "gemini-3.8-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.1-flash-lite",
+];
+
+/** How long a model rests after a per-minute limit, when the API gives no delay. */
+export const MODEL_REST_AFTER_MINUTE_LIMIT_MS = 60_000;
+/** How long a model rests after its daily limit, when the API gives no delay; checked again after that. */
+export const MODEL_REST_AFTER_DAILY_LIMIT_MS = 60 * 60_000;
+/** How long a model rests after an overload, server error or timeout. */
+export const MODEL_REST_AFTER_FAILURE_MS = 60_000;
 
 /**
  * Reasoning depth. The model's default is HIGH; Google recommends MEDIUM for

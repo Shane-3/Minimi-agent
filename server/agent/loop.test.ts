@@ -61,9 +61,9 @@ const prompt = {
   contents: [{ role: "user", parts: [{ text: "What did we decide?" }] }],
 };
 
-function agentWith(turns: FakeTurn[]) {
+function agentWith(turns: FakeTurn[], models = ["test-model"]) {
   const { client, calls } = fakeClient(turns);
-  return { agent: createAgent({ apiKey: "test", model: "test-model", client }), calls };
+  return { agent: createAgent({ apiKey: "test", models, client }), calls };
 }
 
 async function failure(promise: Promise<unknown>): Promise<AgentError> {
@@ -139,7 +139,7 @@ describe("createAgent", () => {
     const { agent, calls } = agentWith([{ text: ["x"], errorAt: 0, error: exhausted }]);
     const error = await failure(agent.answer({ ...prompt, onText: () => {} }));
     expect(error).toMatchObject({ code: "quota_exhausted", retryable: false });
-    expect(error.message).toBe("The model's daily limit is used up. Questions will work again tomorrow.");
+    expect(error.message).toBe("The daily request limit is used up. Questions will work again tomorrow.");
     expect(calls).toHaveLength(1);
   });
 
@@ -235,5 +235,110 @@ describe("createAgent", () => {
     const answer = failure(agent.answer({ ...prompt, onText: () => {} }));
     await vi.advanceTimersByTimeAsync(60_000 + 1_500 + 60_000);
     expect(await answer).toMatchObject({ code: "timeout", retryable: true });
+  });
+});
+
+describe("createAgent with a pool of models", () => {
+  const POOL = ["best", "second", "third"];
+  const modelOf = (call: unknown) => (call as { model: string }).model;
+
+  // Shaped like the API's 429 body: the quota id names the window, and
+  // RetryInfo, when present, says how long to wait.
+  const perMinute = (seconds?: number) => {
+    const retry = seconds === undefined ? "" : `,{"retryDelay":"${seconds}s"}`;
+    return new ApiError({
+      status: 429,
+      message: `{"error":{"details":[{"quotaId":"GenerateRequestsPerMinutePerProjectPerModel-FreeTier"}${retry}]}}`,
+    });
+  };
+  const perDay = () =>
+    new ApiError({
+      status: 429,
+      message: '{"error":{"details":[{"quotaId":"GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]}}',
+    });
+  const failsWith = (error: unknown): FakeTurn => ({ errorAt: 0, text: ["x"], error });
+
+  it("answers with the best model when it is free", async () => {
+    const { agent, calls } = agentWith([{ text: ["ok"] }], POOL);
+    await agent.answer({ ...prompt, onText: () => {} });
+    expect(calls.map(modelOf)).toEqual(["best"]);
+  });
+
+  it("moves to the next model at once when one hits its per-minute limit", async () => {
+    const { agent, calls } = agentWith([failsWith(perMinute()), { text: ["ok"] }], POOL);
+    expect((await agent.answer({ ...prompt, onText: () => {} })).text).toBe("ok");
+    expect(calls.map(modelOf)).toEqual(["best", "second"]);
+  });
+
+  it("moves past every model whose daily limit is used up", async () => {
+    const { agent, calls } = agentWith([failsWith(perDay()), failsWith(perDay()), { text: ["ok"] }], POOL);
+    expect((await agent.answer({ ...prompt, onText: () => {} })).text).toBe("ok");
+    expect(calls.map(modelOf)).toEqual(["best", "second", "third"]);
+  });
+
+  it("moves to the next model after an overload, without waiting", async () => {
+    const { agent, calls } = agentWith([failsWith(overloaded()), { text: ["ok"] }], POOL);
+    expect((await agent.answer({ ...prompt, onText: () => {} })).text).toBe("ok");
+    expect(calls.map(modelOf)).toEqual(["best", "second"]);
+  });
+
+  it("gives an overload only one more try, even with models to spare", async () => {
+    const { agent, calls } = agentWith([failsWith(overloaded()), failsWith(overloaded())], POOL);
+    expect(await failure(agent.answer({ ...prompt, onText: () => {} }))).toMatchObject({ code: "unavailable" });
+    expect(calls).toHaveLength(2);
+  });
+
+  it("does not change model once text has reached the user", async () => {
+    const { agent, calls } = agentWith([{ text: ["Partial ", "rest"], errorAt: 1, error: perMinute() }], POOL);
+    expect(await failure(agent.answer({ ...prompt, onText: () => {} }))).toMatchObject({
+      code: "rate_limited",
+      partialText: "Partial ",
+    });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("skips a resting model on the next question too", async () => {
+    const { agent, calls } = agentWith([failsWith(perDay()), { text: ["one"] }, { text: ["two"] }], POOL);
+    await agent.answer({ ...prompt, onText: () => {} });
+    await agent.answer({ ...prompt, onText: () => {} });
+    expect(calls.map(modelOf)).toEqual(["best", "second", "second"]);
+  });
+
+  it("goes back to the best model once its rest is over, using the wait the API asked for", async () => {
+    vi.useFakeTimers();
+    const { agent, calls } = agentWith(
+      [failsWith(perMinute(35)), { text: ["one"] }, { text: ["two"] }, { text: ["three"] }],
+      POOL,
+    );
+    await agent.answer({ ...prompt, onText: () => {} });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await agent.answer({ ...prompt, onText: () => {} });
+    await vi.advanceTimersByTimeAsync(5_000);
+    await agent.answer({ ...prompt, onText: () => {} });
+    expect(calls.map(modelOf)).toEqual(["best", "second", "second", "best"]);
+  });
+
+  it("says the daily limit is used up when every model has used its own", async () => {
+    const { agent, calls } = agentWith([failsWith(perDay()), failsWith(perDay()), failsWith(perDay())], POOL);
+    expect(await failure(agent.answer({ ...prompt, onText: () => {} }))).toMatchObject({
+      code: "quota_exhausted",
+      retryable: false,
+    });
+    expect(calls).toHaveLength(3);
+  });
+
+  it("asks the user to wait when the soonest model back is only at its per-minute limit", async () => {
+    const { agent } = agentWith([failsWith(perDay()), failsWith(perMinute(20)), failsWith(perDay())], POOL);
+    expect(await failure(agent.answer({ ...prompt, onText: () => {} }))).toMatchObject({
+      code: "rate_limited",
+      retryable: true,
+    });
+  });
+
+  it("does not move on after a rejected key, which every model would reject", async () => {
+    const rejected = new ApiError({ status: 400, message: '{"error":{"details":[{"reason":"API_KEY_INVALID"}]}}' });
+    const { agent, calls } = agentWith([failsWith(rejected)], POOL);
+    expect(await failure(agent.answer({ ...prompt, onText: () => {} }))).toMatchObject({ code: "auth" });
+    expect(calls).toHaveLength(1);
   });
 });

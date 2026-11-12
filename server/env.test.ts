@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_MODELS } from "./config.ts";
 import { EnvError, missingKeyMessages, readEnv } from "./env.ts";
 
 describe("readEnv", () => {
   it("reads both keys and defaults the port", () => {
     const env = readEnv({ GEMINI_API_KEY: "a-key", TAVILY_API_KEY: "t-key" });
-    expect(env).toEqual({ geminiKey: "a-key", tavilyKey: "t-key", port: 3000, model: "gemini-4-hydrogen" });
+    expect(env).toEqual({ geminiKey: "a-key", tavilyKey: "t-key", port: 3000, models: DEFAULT_MODELS });
   });
 
   it("treats an unset key as missing", () => {
@@ -19,9 +20,12 @@ describe("readEnv", () => {
     expect(env.tavilyKey).toBeNull();
   });
 
-  it("reads a model override, and ignores a blank one", () => {
-    expect(readEnv({ GEMINI_MODEL: "gemini-4-argon" }).model).toBe("gemini-4-argon");
-    expect(readEnv({ GEMINI_MODEL: " " }).model).toBe("gemini-4-hydrogen");
+  it("reads a model list, best first, and ignores a blank one", () => {
+    expect(readEnv({ GEMINI_MODELS: "gemini-3.6-flash, gemini-3.5-flash-lite ," }).models).toEqual([
+      "gemini-3.6-flash",
+      "gemini-3.5-flash-lite",
+    ]);
+    expect(readEnv({ GEMINI_MODELS: " , " }).models).toEqual(DEFAULT_MODELS);
   });
 
   it("reads a custom port", () => {

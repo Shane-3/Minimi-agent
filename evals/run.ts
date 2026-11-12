@@ -23,7 +23,7 @@ async function main(): Promise<void> {
     console.error("Add GEMINI_API_KEY to .env to run the evals. They make real model calls.");
     process.exit(1);
   }
-  const agent = createAgent({ apiKey: env.geminiKey, model: env.model });
+  const agent = createAgent({ apiKey: env.geminiKey, models: env.models });
 
   const now = new Date();
   const store = new Store(":memory:");
@@ -34,7 +34,7 @@ async function main(): Promise<void> {
   const only = new Set(process.argv.slice(2).map(Number));
   const cases = evalCases(context).filter((evalCase) => only.size === 0 || only.has(evalCase.id));
 
-  console.log(`Model ${env.model}, sample loaded as of ${formatDay(todayIn(now, TIMEZONE), todayIn(now, TIMEZONE))} (${TIMEZONE})\n`);
+  console.log(`Models ${env.models.join(", ")}, sample loaded as of ${formatDay(todayIn(now, TIMEZONE), todayIn(now, TIMEZONE))} (${TIMEZONE})\n`);
   let failed = 0;
   for (const [index, evalCase] of cases.entries()) {
     // The free tier allows 5 requests a minute; spacing the calls keeps a run
@@ -47,6 +47,9 @@ async function main(): Promise<void> {
     let started = performance.now();
     let firstText: number | null = null;
     let answer: string;
+    // The pool may move to another model, so each result says which one
+    // answered: a weaker model failing a case reads differently.
+    let answeredBy = "";
     const ask = async () => {
       started = performance.now();
       firstText = null;
@@ -56,6 +59,7 @@ async function main(): Promise<void> {
           firstText ??= performance.now();
         },
       });
+      answeredBy = result.model;
       return result.text;
     };
     try {
@@ -69,8 +73,8 @@ async function main(): Promise<void> {
           store.close();
           process.exit(1);
         }
-        // Hitting the per-minute limit says nothing about the answers either,
-        // so wait out the minute and ask again once. Timings are of the second try.
+        // Every model at its per-minute limit says nothing about the answers
+        // either, so wait out the minute and ask again once. Timings are of the second try.
         if (!(error instanceof AgentError && error.code === "rate_limited")) throw error;
         console.log(`     ${evalCase.id}. rate limited; waiting ${RATE_LIMIT_WAIT_MS / 1000}s and asking again`);
         await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_WAIT_MS));
@@ -87,7 +91,7 @@ async function main(): Promise<void> {
     const seconds = (ms: number | null) => (ms === null ? "-" : `${((ms - started) / 1000).toFixed(1)}s`);
 
     const misses = evalCase.checks.filter((check) => !check.pass(answer)).map((check) => check.name);
-    const timing = `first text ${seconds(firstText)}, done ${seconds(performance.now())}`;
+    const timing = `${answeredBy}, first text ${seconds(firstText)}, done ${seconds(performance.now())}`;
     if (misses.length === 0) {
       console.log(`PASS ${evalCase.id}. ${evalCase.name} (${timing})`);
     } else {

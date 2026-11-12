@@ -176,7 +176,7 @@ Starting values, kept in one config file and tuned during evals.
 
 ## 10. Stack
 
-TypeScript, Node 22, Express with Vite in middleware mode (one process, one port), React, `@google/genai` (model `gemini-4-hydrogen`, overridable with `GEMINI_MODEL`), Tavily over `fetch`, `better-sqlite3`, `chrono-node`, `zod`, Vitest.
+TypeScript, Node 22, Express with Vite in middleware mode (one process, one port), React, `@google/genai` (a pool of free-tier models, best first, from `gemini-4-hydrogen`; when one hits its rate limit or is overloaded the answer moves to the next before any text is shown; `GEMINI_MODELS` replaces the list), Tavily over `fetch`, `better-sqlite3`, `chrono-node`, `zod`, Vitest.
 
 Keys: `GEMINI_API_KEY`, `TAVILY_API_KEY`.
 

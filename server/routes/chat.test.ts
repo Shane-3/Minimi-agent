@@ -43,7 +43,7 @@ async function start(agent: Agent | null): Promise<void> {
   app.use(
     "/api",
     createApi({
-      env: { geminiKey: agent === null ? null : "a-key", tavilyKey: null, port: 0, model: "test-model" },
+      env: { geminiKey: agent === null ? null : "a-key", tavilyKey: null, port: 0, models: ["test-model"] },
       store,
       samplePath: SAMPLE_PATH,
       agent,

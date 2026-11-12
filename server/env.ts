@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { DEFAULT_MODEL } from "./config.ts";
+import { DEFAULT_MODELS } from "./config.ts";
 
 export interface Env {
   /** null when the key is not set. */
   geminiKey: string | null;
   tavilyKey: string | null;
   port: number;
-  /** Gemini model id. Not a key: it has a default and only changes for testing. */
-  model: string;
+  /** Gemini model ids, best first. Not keys: they have defaults and only change for testing. */
+  models: string[];
 }
 
 export class EnvError extends Error {
@@ -21,13 +21,19 @@ const schema = z.object({
   GEMINI_API_KEY: z.string().optional(),
   TAVILY_API_KEY: z.string().optional(),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  GEMINI_MODEL: z.string().optional(),
+  GEMINI_MODELS: z.string().optional(),
 });
 
 // A key left blank in a copied .env.example counts as missing.
 function keyOrNull(value: string | undefined): string | null {
   const trimmed = value?.trim() ?? "";
   return trimmed === "" ? null : trimmed;
+}
+
+// "a, b" becomes ["a", "b"]. Blank or empty means the default list.
+function modelList(value: string | undefined): string[] | null {
+  const models = (value ?? "").split(",").map((model) => model.trim()).filter((model) => model !== "");
+  return models.length === 0 ? null : models;
 }
 
 export function readEnv(source: NodeJS.ProcessEnv): Env {
@@ -39,7 +45,7 @@ export function readEnv(source: NodeJS.ProcessEnv): Env {
     geminiKey: keyOrNull(parsed.data.GEMINI_API_KEY),
     tavilyKey: keyOrNull(parsed.data.TAVILY_API_KEY),
     port: parsed.data.PORT,
-    model: keyOrNull(parsed.data.GEMINI_MODEL) ?? DEFAULT_MODEL,
+    models: modelList(parsed.data.GEMINI_MODELS) ?? DEFAULT_MODELS,
   };
 }
 

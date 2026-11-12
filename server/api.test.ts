@@ -34,7 +34,7 @@ describe("API", () => {
     app.use(
       "/api",
       createApi({
-        env: { geminiKey: "a-key", tavilyKey: null, port: 0, model: "test-model" },
+        env: { geminiKey: "a-key", tavilyKey: null, port: 0, models: ["test-model"] },
         store,
         samplePath: SAMPLE_PATH,
         agent: null,

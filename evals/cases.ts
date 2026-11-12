@@ -19,9 +19,10 @@ export interface EvalCase {
   checks: Check[];
 }
 
-// The ways a correct answer says the records hold nothing on it. "Do not
-// mention" was added after a correct answer used it and this check missed it.
-const NO_RECORD = /no record|nothing (?:is |was )?(?:recorded|stored|on|about)|(?:don't|do not) have (?:any )?(?:record|anything)|no (?:meeting|note|chat)s?|isn't (?:anything|any record)|there (?:is|are) no|not (?:in|mentioned in) (?:your|the|any) records|(?:do|does|did)(?: not|n't) mention|no mention|not mentioned/i;
+// The ways a correct answer says the records hold nothing on it. Widened
+// twice after correct answers ("do not mention", "do not contain anything
+// about") were marked as failures.
+const NO_RECORD = /no record|nothing (?:is |was )?(?:recorded|stored|on|about)|(?:don't|do not) have (?:any )?(?:record|anything)|no (?:meeting|note|chat)s?|isn't (?:anything|any record)|there (?:is|are) no|not (?:in|mentioned in) (?:your|the|any) records|(?:do|does|did)(?: not|n't) (?:mention|contain|include|cover|say anything|have anything)|no mention|not mentioned/i;
 const NOT_DECIDED = /nothing (?:was|has been) decided|no decision|not (?:yet )?decided|(?:wasn't|was not|hasn't been|has not been) decided|undecided|did(?:n't| not) decide/i;
 
 export function evalCases(context: EvalContext): EvalCase[] {

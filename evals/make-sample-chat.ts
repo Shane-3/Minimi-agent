@@ -1,5 +1,11 @@
-// TEMPORARY, not committed: one real agent run whose question and answer become
-// the sample's 3 November chat (AGENTS.md rule 4: prices must come from a real run).
+// npx tsx evals/make-sample-chat.ts <output.json>
+// How the sample's 3 November chat (sample-postgres-prices-chat) was made:
+// one real run of the agent, with live web search, whose question and answer
+// were copied word for word into data/sample.json. AGENTS.md rule 4 requires
+// any sample that states a real product's price to come from a real run; this
+// script is that run, kept so it can be repeated. The prompt's clock is set to
+// Tue 3 Nov so the answer dates itself to the day the record sits on; the
+// search results are whatever the web shows when it is run.
 import { writeFileSync } from "node:fs";
 import { createAgent } from "../server/agent/loop.ts";
 import { buildPrompt } from "../server/agent/prompt.ts";

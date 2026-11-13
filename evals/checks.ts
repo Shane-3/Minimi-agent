@@ -63,7 +63,8 @@ export function near(name: string, anchor: RegExp, patterns: RegExp[], distance 
 }
 
 /** At least one quote in the answer format: > **Speaker:** "words". */
-export const quotesASpeaker = contains("quotes a speaker", /^>\s*\*\*[^*\n]+\*\*/m);
+// The quote may be indented under a list item; Markdown renders it the same.
+export const quotesASpeaker = contains("quotes a speaker", /^[ \t]*>\s*\*\*[^*\n]+\*\*/m);
 
 const MONTHS = "Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?";
 const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];

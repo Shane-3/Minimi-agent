@@ -108,8 +108,8 @@ export const PARTIAL_NEIGHBOUR_SEGMENTS = 2;
 /** Search hits read when ranking records by topic. */
 export const TOPIC_SEARCH_LIMIT = 200;
 
-export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
-export const MESSAGE_MAX_CHARS = 4_000;
+// Shared with the browser, which checks them before sending.
+export { IMPORT_MAX_BYTES, MESSAGE_MAX_CHARS } from "../shared/limits.ts";
 
 /**
  * JSON body limit for the API. The file's text is sent inside a JSON string,

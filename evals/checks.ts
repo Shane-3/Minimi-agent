@@ -7,12 +7,26 @@ export interface Check {
   pass: (answer: string) => boolean;
 }
 
+/**
+ * Some models write typographic characters where the records have plain
+ * ones: non-breaking or thin spaces ("3\u202fNov"), non-breaking hyphens
+ * ("12\u2011month") and curly quotes. They read the same, so every check
+ * reads them as their plain forms.
+ */
+function plain(answer: string): string {
+  return answer
+    .replace(/[\u00a0\u2007\u2009\u200a\u202f]/g, " ")
+    .replace(/[\u2010\u2011]/g, "-")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"');
+}
+
 export function contains(name: string, pattern: RegExp): Check {
-  return { name, pass: (answer) => pattern.test(answer) };
+  return { name, pass: (answer) => pattern.test(plain(answer)) };
 }
 
 export function lacks(name: string, pattern: RegExp): Check {
-  return { name, pass: (answer) => !pattern.test(answer) };
+  return { name, pass: (answer) => !pattern.test(plain(answer)) };
 }
 
 /**
@@ -23,7 +37,8 @@ export function lacks(name: string, pattern: RegExp): Check {
 export function inOrder(name: string, first: string, second: string): Check {
   return {
     name,
-    pass: (answer) => {
+    pass: (raw) => {
+      const answer = plain(raw);
       const a = answer.indexOf(first);
       const b = answer.lastIndexOf(second);
       return a !== -1 && b !== -1 && a < b;
@@ -35,7 +50,8 @@ export function inOrder(name: string, first: string, second: string): Check {
 export function near(name: string, anchor: RegExp, patterns: RegExp[], distance = 250): Check {
   return {
     name,
-    pass: (answer) => {
+    pass: (raw) => {
+      const answer = plain(raw);
       for (const match of answer.matchAll(new RegExp(anchor.source, `${anchor.flags.replace("g", "")}g`))) {
         const start = Math.max(0, (match.index ?? 0) - distance);
         const window = answer.slice(start, (match.index ?? 0) + match[0].length + distance);
@@ -67,8 +83,10 @@ export function numbersFrom(recordsText: string): Check {
   };
   return {
     name: "every number is in the records",
-    pass: (answer) => {
-      const withoutDates = answer
+    pass: (raw) => {
+      const withoutDates = plain(raw)
+        // List numbering ("1.", "2)") is layout, not a figure.
+        .replace(/^\s*\d+[.)]\s/gm, " ")
         .replace(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${MONTHS})\\b(?:\\s+\\d{4})?`, "gi"), " ")
         .replace(new RegExp(`\\b(?:${MONTHS})\\s+\\d{1,2}(?:st|nd|rd|th)?\\b`, "gi"), " ")
         .replace(/\b\d{1,2}:\d{2}\b/g, " ")

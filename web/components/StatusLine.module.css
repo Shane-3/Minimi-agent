@@ -1,0 +1,25 @@
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+/* A slow opacity pulse only; reduced motion turns it off (base.css). */
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}

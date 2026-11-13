@@ -1,0 +1,26 @@
+.note {
+  margin-top: var(--space-3);
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.note::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: var(--space-2);
+  border-radius: 50%;
+  background: #9a9a96;
+  vertical-align: 1px;
+}
+
+.warning {
+  color: var(--accent-text);
+}
+
+.warning::before {
+  background: var(--accent);
+}

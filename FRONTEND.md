@@ -154,7 +154,8 @@ Plain, specific, no exclamation marks, no apologies beyond one "Sorry" where som
 ```
 web/
   main.tsx  App.tsx  styles/tokens.css  styles/base.css
-  api/client.ts        fetch wrappers and the SSE reader (uses fetch streaming, since the chat request is a POST)
+  http/client.ts       fetch wrappers and the SSE reader (uses fetch streaming, since the chat request is a POST).
+                       Not web/api/: in dev Vite serves it at /api/client.ts, which the API route answers first.
   state/chat.ts        reducer: messages, stream state
   state/records.ts     reducer: records, import state
   components/

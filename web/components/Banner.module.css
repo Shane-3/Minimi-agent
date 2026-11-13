@@ -1,0 +1,23 @@
+.banner {
+  padding: var(--space-2) var(--space-6);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.danger {
+  border-bottom-color: #f6d4d0;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-weight: 500;
+}
+
+@media (max-width: 719px) {
+  .banner {
+    padding: var(--space-2) var(--space-4);
+    text-align: left;
+  }
+}

@@ -14,20 +14,32 @@ export const MODEL_RETRIES = 1;
 /** Wait before the one retry after an overload or server error. */
 export const MODEL_RETRY_DELAY_MS = 1_500;
 
+/** Cerebras's OpenAI-compatible endpoint. */
+export const MODEL_BASE_URL = "https://api.cerebras.ai/v1";
+
 /**
  * Models to answer with, best first: the only place model ids are written.
- * GEMINI_MODELS in .env replaces the list. Free-tier limits are counted per
- * model, so when one hits its limit, or is overloaded, the answer moves to
- * the next. All five are stable and on the free tier; the later ones are
- * faster but less consistent.
+ * CEREBRAS_MODELS in .env replaces the list. Limits are counted per model, so
+ * when one hits its limit, or is overloaded, the answer moves to the next.
+ * Qwen passed every recall eval with reasoning off and starts answering in
+ * well under a second; gpt-oss is the backup.
  */
-export const DEFAULT_MODELS = [
-  "gemini-4-hydrogen",
-  "gemini-3.8-flash",
-  "gemini-3.6-flash",
-  "gemini-3.5-flash-lite",
-  "gemini-3.1-flash-lite",
-];
+export const DEFAULT_MODELS = ["qwen-3.8-27b", "gpt-oss-120b"];
+
+export type ReasoningEffort = "none" | "low" | "medium" | "high";
+
+/**
+ * Reasoning for recall answers, per model. With reasoning off, Qwen sometimes
+ * worked out a weekday wrongly ("Monday 14 Nov", a Saturday) or left a
+ * decision out of a summary. At medium it passed every recall eval in two
+ * runs, and answers still start within about a second on Cerebras, so
+ * accuracy wins. A model not listed gets RECALL_REASONING_DEFAULT.
+ */
+export const RECALL_REASONING: { [model: string]: ReasoningEffort } = {
+  "qwen-3.8-27b": "medium",
+  "gpt-oss-120b": "medium",
+};
+export const RECALL_REASONING_DEFAULT: ReasoningEffort = "medium";
 
 /** How long a model rests after a per-minute limit, when the API gives no delay. */
 export const MODEL_REST_AFTER_MINUTE_LIMIT_MS = 60_000;
@@ -37,20 +49,18 @@ export const MODEL_REST_AFTER_DAILY_LIMIT_MS = 60 * 60_000;
 export const MODEL_REST_AFTER_FAILURE_MS = 60_000;
 
 /**
- * Reasoning depth. The model's default is HIGH; Google recommends MEDIUM for
- * responsive chat, and recall answers read records already in the prompt.
- * Tuned against the evals.
+ * Caps reasoning and answer together. Recall answers are a few hundred
+ * tokens; this leaves ample room without letting a runaway answer use up the
+ * per-minute token limit.
  */
-export const MODEL_THINKING_LEVEL: "LOW" | "MEDIUM" | "HIGH" = "MEDIUM";
+export const MODEL_MAX_TOKENS = 8_192;
 
 /**
- * Caps thinking and answer together, so it must not be low or answers get cut
- * off. 65,536 is the model's single-request maximum.
+ * Tokens of record text the prompt may hold. Kept well under the free tier's
+ * 30,000 uncached tokens a minute, so one question never exceeds the
+ * per-minute limit on its own and a second still fits.
  */
-export const MODEL_MAX_TOKENS = 65_536;
-
-/** Tokens of record text the prompt may hold. */
-export const RECORD_CONTEXT_BUDGET_TOKENS = 80_000;
+export const RECORD_CONTEXT_BUDGET_TOKENS = 20_000;
 
 /** Rough token estimate. Good enough for a budget; no tokenizer dependency. */
 export const CHARS_PER_TOKEN = 4;

@@ -15,7 +15,7 @@ export interface ApiOptions {
   env: Env;
   store: Store;
   samplePath: string;
-  /** Null when GEMINI_API_KEY is not set. */
+  /** Null when CEREBRAS_API_KEY is not set. */
   agent: Agent | null;
   now?: () => Date;
 }
@@ -25,7 +25,7 @@ export function createApi({ env, store, samplePath, agent, now }: ApiOptions): R
   api.use(express.json({ limit: API_BODY_LIMIT }));
 
   api.get("/health", (_req, res) => {
-    const health: Health = { gemini: env.geminiKey !== null, tavily: env.tavilyKey !== null };
+    const health: Health = { cerebras: env.cerebrasKey !== null, tavily: env.tavilyKey !== null };
     res.json(health);
   });
 

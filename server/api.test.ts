@@ -34,7 +34,7 @@ describe("API", () => {
     app.use(
       "/api",
       createApi({
-        env: { geminiKey: "a-key", tavilyKey: null, port: 0, models: ["test-model"] },
+        env: { cerebrasKey: "a-key", tavilyKey: null, port: 0, models: ["test-model"] },
         store,
         samplePath: SAMPLE_PATH,
         agent: null,
@@ -61,7 +61,7 @@ describe("API", () => {
 
   it("reports which keys are set, without the keys", async () => {
     const response = await fetch(`${base}/health`);
-    expect(await response.json()).toEqual({ gemini: true, tavily: false });
+    expect(await response.json()).toEqual({ cerebras: true, tavily: false });
   });
 
   it("imports a file sent as raw text", async () => {

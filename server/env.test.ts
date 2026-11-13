@@ -4,28 +4,28 @@ import { EnvError, missingKeyMessages, readEnv } from "./env.ts";
 
 describe("readEnv", () => {
   it("reads both keys and defaults the port", () => {
-    const env = readEnv({ GEMINI_API_KEY: "a-key", TAVILY_API_KEY: "t-key" });
-    expect(env).toEqual({ geminiKey: "a-key", tavilyKey: "t-key", port: 3000, models: DEFAULT_MODELS });
+    const env = readEnv({ CEREBRAS_API_KEY: "a-key", TAVILY_API_KEY: "t-key" });
+    expect(env).toEqual({ cerebrasKey: "a-key", tavilyKey: "t-key", port: 3000, models: DEFAULT_MODELS });
   });
 
   it("treats an unset key as missing", () => {
     const env = readEnv({ TAVILY_API_KEY: "t-key" });
-    expect(env.geminiKey).toBeNull();
+    expect(env.cerebrasKey).toBeNull();
     expect(env.tavilyKey).toBe("t-key");
   });
 
   it("treats a blank key as missing", () => {
-    const env = readEnv({ GEMINI_API_KEY: "", TAVILY_API_KEY: "   " });
-    expect(env.geminiKey).toBeNull();
+    const env = readEnv({ CEREBRAS_API_KEY: "", TAVILY_API_KEY: "   " });
+    expect(env.cerebrasKey).toBeNull();
     expect(env.tavilyKey).toBeNull();
   });
 
   it("reads a model list, best first, and ignores a blank one", () => {
-    expect(readEnv({ GEMINI_MODELS: "gemini-3.6-flash, gemini-3.5-flash-lite ," }).models).toEqual([
-      "gemini-3.6-flash",
-      "gemini-3.5-flash-lite",
+    expect(readEnv({ CEREBRAS_MODELS: "gpt-oss-120b, qwen-3.8-27b ," }).models).toEqual([
+      "gpt-oss-120b",
+      "qwen-3.8-27b",
     ]);
-    expect(readEnv({ GEMINI_MODELS: " , " }).models).toEqual(DEFAULT_MODELS);
+    expect(readEnv({ CEREBRAS_MODELS: " , " }).models).toEqual(DEFAULT_MODELS);
   });
 
   it("reads a custom port", () => {
@@ -39,18 +39,18 @@ describe("readEnv", () => {
 
 describe("missingKeyMessages", () => {
   it("is empty when both keys are set", () => {
-    const env = readEnv({ GEMINI_API_KEY: "a-key", TAVILY_API_KEY: "t-key" });
+    const env = readEnv({ CEREBRAS_API_KEY: "a-key", TAVILY_API_KEY: "t-key" });
     expect(missingKeyMessages(env)).toEqual([]);
   });
 
-  it("names the Gemini key when it is missing", () => {
+  it("names the Cerebras key when it is missing", () => {
     const messages = missingKeyMessages(readEnv({ TAVILY_API_KEY: "t-key" }));
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("GEMINI_API_KEY");
+    expect(messages[0]).toContain("CEREBRAS_API_KEY");
   });
 
   it("names the Tavily key when it is missing", () => {
-    const messages = missingKeyMessages(readEnv({ GEMINI_API_KEY: "a-key" }));
+    const messages = missingKeyMessages(readEnv({ CEREBRAS_API_KEY: "a-key" }));
     expect(messages).toHaveLength(1);
     expect(messages[0]).toContain("TAVILY_API_KEY");
   });

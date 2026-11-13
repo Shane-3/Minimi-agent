@@ -1,28 +1,28 @@
-// npx tsx evals/speed.ts [--levels LOW,MEDIUM] [model ...]
-// Compares free-tier models for speed and correctness on a few eval cases,
-// at the given thinking levels (default LOW and MEDIUM; Gemma takes only
-// MINIMAL or HIGH). Each model is asked on its own (a pool
-// of one), so the timings are that model's, not the pool's.
+// npx tsx evals/speed.ts [--levels none,low] [model ...]
+// Compares models for speed and correctness on a few eval cases, at the
+// given reasoning levels (default none and low; gpt-oss cannot go below low).
+// Each model is asked on its own (a pool of one), so the timings are that
+// model's, not the pool's.
 //
 // Calls go round the models in turn, so each model sees a call only every
 // few seconds and stays inside its per-minute limit.
-import { DEFAULT_MODELS } from "../server/config.ts";
-import { AgentError, createAgent, type ThinkingLevelName } from "../server/agent/loop.ts";
+import { DEFAULT_MODELS, type ReasoningEffort } from "../server/config.ts";
+import { AgentError, createAgent } from "../server/agent/loop.ts";
 import { evalCases } from "./cases.ts";
 import { askCase, evalEnv, sampleHistory } from "./setup.ts";
 
 /** Summary (the hardest), a decision with its quote, and a date with no record. */
 const CASES = [1, 2, 6];
-const LEVEL_NAMES: ThinkingLevelName[] = ["MINIMAL", "LOW", "MEDIUM", "HIGH"];
+const LEVEL_NAMES: ReasoningEffort[] = ["none", "low", "medium", "high"];
 
-function parseArgs(args: string[]): { levels: ThinkingLevelName[]; models: string[] } {
-  let levels: ThinkingLevelName[] = ["LOW", "MEDIUM"];
+function parseArgs(args: string[]): { levels: ReasoningEffort[]; models: string[] } {
+  let levels: ReasoningEffort[] = ["none", "low"];
   const models: string[] = [];
   for (let index = 0; index < args.length; index += 1) {
     if (args[index] === "--levels") {
       levels = (args[index + 1] ?? "").split(",").map((level) => {
-        const name = level.trim().toUpperCase() as ThinkingLevelName;
-        if (!LEVEL_NAMES.includes(name)) throw new Error(`Unknown thinking level "${level}"`);
+        const name = LEVEL_NAMES.find((known) => known === level.trim().toLowerCase());
+        if (name === undefined) throw new Error(`Unknown reasoning level "${level}"`);
         return name;
       });
       index += 1;
@@ -35,7 +35,7 @@ function parseArgs(args: string[]): { levels: ThinkingLevelName[]; models: strin
 
 interface Row {
   model: string;
-  level: ThinkingLevelName;
+  level: ReasoningEffort;
   caseId: number;
   outcome: string;
   firstText: number | null;
@@ -51,7 +51,7 @@ async function main(): Promise<void> {
   // One agent per model and level, so the pool never moves a call elsewhere.
   const agents = new Map(
     models.flatMap((model) =>
-      LEVELS.map((level) => [`${model} ${level}`, createAgent({ apiKey: env.geminiKey, models: [model], thinkingLevel: level })]),
+      LEVELS.map((level) => [`${model} ${level}`, createAgent({ apiKey: env.cerebrasKey, models: [model], reasoning: level })]),
     ),
   );
   // Models that ran out of requests today are skipped for the rest of the run.

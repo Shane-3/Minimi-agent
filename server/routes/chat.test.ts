@@ -43,7 +43,7 @@ async function start(agent: Agent | null): Promise<void> {
   app.use(
     "/api",
     createApi({
-      env: { geminiKey: agent === null ? null : "a-key", tavilyKey: null, port: 0, models: ["test-model"] },
+      env: { cerebrasKey: agent === null ? null : "a-key", tavilyKey: null, port: 0, models: ["test-model"] },
       store,
       samplePath: SAMPLE_PATH,
       agent,
@@ -116,8 +116,8 @@ describe("POST /api/chat", () => {
 
     await ask({ message: "And who owns the next step?", threadId });
     const second = requests[1]!;
-    expect(second.contents.map((content) => content.role)).toEqual(["user", "model", "user"]);
-    expect(second.contents[0]?.parts).toEqual([{ text: "What did we decide about Acme?" }]);
+    expect(second.messages.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
+    expect(second.messages[0]?.content).toBe("What did we decide about Acme?");
     // Its own messages are already in the conversation, so not repeated as a record.
     expect(second.system).not.toContain("What did we decide about Acme?");
   });
@@ -192,13 +192,13 @@ describe("POST /api/chat", () => {
     expect(store.getRecord(imported.id)?.segments).toHaveLength(1);
   });
 
-  it("answers 503 with the setup message when the Gemini key is missing", async () => {
+  it("answers 503 with the setup message when the Cerebras key is missing", async () => {
     await start(null);
     const response = await post("/chat", { timezone: KOLKATA, message: "Hi" });
     expect(response.status).toBe(503);
     expect(((await response.json()) as ApiError).error).toEqual({
       code: "missing_key",
-      message: "Add GEMINI_API_KEY to .env and restart the server.",
+      message: "Add CEREBRAS_API_KEY to .env and restart the server.",
     });
   });
 

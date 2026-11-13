@@ -27,7 +27,7 @@ function promptFor(question: string, budgetTokens?: number) {
 
 // The system instruction is the rules, a blank line, then the memory.
 const memoryOf = (prompt: ReturnType<typeof promptFor>) => prompt.system.slice(`${RULES}\n\n`.length);
-const turnOf = (prompt: ReturnType<typeof promptFor>) => prompt.contents.at(-1)?.parts?.[0]?.text ?? "";
+const turnOf = (prompt: ReturnType<typeof promptFor>) => prompt.messages.at(-1)?.content ?? "";
 
 describe("buildPrompt: system", () => {
   it("puts the fixed rules first, then the memory", () => {
@@ -161,8 +161,7 @@ describe("buildPrompt: conversation history", () => {
       timezone: KOLKATA,
       now: NOW,
     });
-    // Gemini's name for the assistant's turns is "model".
-    expect(prompt.contents.map((content) => content.role)).toEqual(["user", "model", "user"]);
-    expect(prompt.contents[1]?.parts).toEqual([{ text: "The shortlist is five tools." }]);
+    expect(prompt.messages.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
+    expect(prompt.messages[1]?.content).toBe("The shortlist is five tools.");
   });
 });

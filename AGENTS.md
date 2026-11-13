@@ -22,7 +22,7 @@ npm run typecheck
 2. **One agent.** No planner, critic or sub-agents. No agent frameworks (LangChain, LangGraph, Vercel AI SDK). The loop in `server/agent/loop.ts` is written by hand.
 3. **Raw records are the truth.** Answers quote stored segments. Nothing model-generated is stored as a fact about a record. There is one model call site, `server/agent/loop.ts`; do not add another.
 4. **Never invent.** No sample prices, quotes or dates made up to look plausible, in code, prompts, tests or sample data. Sample meeting transcripts are fictional and labelled as samples; any sample that states a real product's price must come from a real run of the agent.
-5. **Two keys only.** `GEMINI_API_KEY` and `TAVILY_API_KEY`. Do not add a dependency that needs another key or a running service.
+5. **Two keys only.** `CEREBRAS_API_KEY` and `TAVILY_API_KEY`. Do not add a dependency that needs another key or a running service.
 6. **`npm install` then `npm run dev` must work** on a clean clone with Node 22. No build step, no global installs, no Docker.
 7. **No copied branding.** Do not draw or imitate Minimi's cat mascot or logo. Use the original mark in `web/assets`.
 8. **Out-of-scope list** in `REQUIREMENTS.md` §8 stays out unless the author says otherwise.
@@ -30,12 +30,12 @@ npm run typecheck
 ## Code conventions
 
 - TypeScript, `strict` on. No `any` without a comment saying why.
-- Small files with one job. `server/memory/store.ts` is the only file that touches SQLite. `server/agent/loop.ts` is the only file that calls Gemini. `server/agent/search.ts` is the only file that calls Tavily.
+- Small files with one job. `server/memory/store.ts` is the only file that touches SQLite. `server/agent/loop.ts` is the only file that calls the model (Cerebras). `server/agent/search.ts` is the only file that calls Tavily.
 - Shared types (`MemoryRecord`, `Segment`, `Evidence`, `Check`, SSE events) live in `shared/types.ts` and are used by both server and web. The record type is `MemoryRecord`, not `Record`, so it does not hide TypeScript's built-in `Record<K, V>`.
 - Validate everything that crosses a boundary with zod: env, import files, request bodies, tool inputs.
 - Every external call has a timeout and a typed error. No unhandled promise rejections.
 - Comments explain why, not what. The author must be able to explain every line, so prefer plain code over clever code.
-- Check current SDK and API docs (Google Gen AI SDK `@google/genai`, Tavily) before writing calls; do not rely on remembered parameter names or model ids. Model ids come from env with defaults set in one place.
+- Check current SDK and API docs (Cerebras, reached through the OpenAI SDK `openai`; Tavily) before writing calls; do not rely on remembered parameter names or model ids. Model ids come from env with defaults set in one place.
 - No secrets, database files or `.env` in git.
 
 ## Build order
@@ -59,7 +59,7 @@ Build in this order. Do not start a step until the previous one passes its check
 ## Testing
 
 - Unit tests sit next to the code as `*.test.ts`.
-- Mock Gemini and Tavily in unit tests. Only `npm run eval` makes real calls.
+- Mock the model API and Tavily in unit tests. Only `npm run eval` makes real calls.
 - A failing test is fixed by fixing the code. Do not weaken or delete a test to make it pass; if a test is wrong, say so and explain.
 
 ## Git

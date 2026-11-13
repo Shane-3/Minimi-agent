@@ -1,7 +1,9 @@
-// npm run eval [case numbers...]
+// npm run eval [--reasoning none|low|medium|high] [case numbers...]
 // Runs the eval cases against the sample history with real model calls,
 // through the same retrieval, prompt and loop the chat route uses.
+// --reasoning overrides the configured per-model setting, for tuning it.
 import { AgentError, createAgent } from "../server/agent/loop.ts";
+import type { ReasoningEffort } from "../server/config.ts";
 import { evalCases } from "./cases.ts";
 import { askCase, evalEnv, sampleHistory, TIMEZONE, type CaseAnswer } from "./setup.ts";
 
@@ -11,13 +13,15 @@ const CALL_GAP_MS = 13_000;
 
 async function main(): Promise<void> {
   const env = evalEnv();
-  const agent = createAgent({ apiKey: env.geminiKey, models: env.models });
+  const { reasoning, caseIds } = parseArgs(process.argv.slice(2));
+  const agent = createAgent({ apiKey: env.cerebrasKey, models: env.models, reasoning });
   const { store, context, today } = sampleHistory(new Date());
 
-  const only = new Set(process.argv.slice(2).map(Number));
+  const only = new Set(caseIds);
   const cases = evalCases(context).filter((evalCase) => only.size === 0 || only.has(evalCase.id));
 
-  console.log(`Models ${env.models.join(", ")}, sample loaded as of ${today} (${TIMEZONE})\n`);
+  const effort = reasoning ?? "as configured";
+  console.log(`Models ${env.models.join(", ")}, reasoning ${effort}, sample loaded as of ${today} (${TIMEZONE})\n`);
   let failed = 0;
   for (const [index, evalCase] of cases.entries()) {
     if (index > 0) await new Promise((resolve) => setTimeout(resolve, CALL_GAP_MS));
@@ -68,6 +72,23 @@ async function main(): Promise<void> {
   store.close();
   console.log(`\n${cases.length - failed} of ${cases.length} passed`);
   process.exit(failed === 0 ? 0 : 1);
+}
+
+const EFFORTS: ReasoningEffort[] = ["none", "low", "medium", "high"];
+
+function parseArgs(args: string[]): { reasoning: ReasoningEffort | undefined; caseIds: number[] } {
+  let reasoning: ReasoningEffort | undefined;
+  const caseIds: number[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === "--reasoning") {
+      reasoning = EFFORTS.find((effort) => effort === args[index + 1]);
+      if (reasoning === undefined) throw new Error(`--reasoning takes one of ${EFFORTS.join(", ")}`);
+      index += 1;
+    } else {
+      caseIds.push(Number(args[index]));
+    }
+  }
+  return { reasoning, caseIds };
 }
 
 main().catch((error: unknown) => {

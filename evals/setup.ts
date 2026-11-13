@@ -15,15 +15,15 @@ import type { EvalCase, EvalContext } from "./cases.ts";
 export const TIMEZONE = "Asia/Kolkata";
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-/** The environment, with a Gemini key; exits with a message when there is none. */
-export function evalEnv(): Env & { geminiKey: string } {
+/** The environment, with a Cerebras key; exits with a message when there is none. */
+export function evalEnv(): Env & { cerebrasKey: string } {
   dotenv.config({ override: true, quiet: true });
   const env = readEnv(process.env);
-  if (env.geminiKey === null) {
-    console.error("Add GEMINI_API_KEY to .env to run the evals. They make real model calls.");
+  if (env.cerebrasKey === null) {
+    console.error("Add CEREBRAS_API_KEY to .env to run the evals. They make real model calls.");
     process.exit(1);
   }
-  return { ...env, geminiKey: env.geminiKey };
+  return { ...env, cerebrasKey: env.cerebrasKey };
 }
 
 /** An in-memory store holding the sample as it would be loaded today, and what the checks need to know about it. */

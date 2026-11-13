@@ -123,7 +123,7 @@ Plain, specific, no exclamation marks, no apologies beyond one "Sorry" where som
 
 | Situation | Text |
 |---|---|
-| Missing Gemini key | "Add GEMINI_API_KEY to .env and restart the server." |
+| Missing model key | "Add CEREBRAS_API_KEY to .env and restart the server." |
 | Missing Tavily key | "Web search is off. Add TAVILY_API_KEY to .env to turn it on. Questions about your records still work." |
 | Not JSON | "This file isn't valid JSON." |
 | Wrong shape | "Record 3 is missing a timestamp." (names the record and field) |

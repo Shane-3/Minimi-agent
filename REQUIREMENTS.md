@@ -10,7 +10,7 @@ Judged on: answers fast, gets things right, good to talk to. Order of priority w
 
 - R1. JavaScript or TypeScript on Node.
 - R2. Runs with `npm install` then `npm run dev`. Nothing else to start.
-- R3. `.env.example` lists every key: `GEMINI_API_KEY`, `TAVILY_API_KEY`.
+- R3. `.env.example` lists every key: `CEREBRAS_API_KEY`, `TAVILY_API_KEY`.
 - R4. The model has exactly one tool: `web_search`.
 - R5. Public GitHub repo with a one-page `DESIGN.md`.
 - R6. Every decision in the code can be explained by its author.

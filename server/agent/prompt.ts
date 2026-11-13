@@ -1,16 +1,21 @@
 // Builds what the model reads: fixed rules, the memory (record index and
 // loaded records), and for each question the facts code has already worked
 // out (today's date, what the date phrases mean, which records match).
-import type { Content } from "@google/genai";
 import type { MemoryRecord, ThreadMessage } from "../../shared/types.ts";
 import { formatDay, partsInZone, todayIn, type CalendarDate } from "../memory/dates.ts";
 import type { DateFinding, Retrieval } from "../memory/retrieve.ts";
+
+/** One turn of the conversation, as plain text. */
+export interface PromptMessage {
+  role: "user" | "assistant";
+  content: string;
+}
 
 export interface Prompt {
   /** The rules, then the memory: the part that stays the same between questions. */
   system: string;
   /** Earlier turns of this conversation, then the new question with its context. */
-  contents: Content[];
+  messages: PromptMessage[];
 }
 
 export interface PromptInput {
@@ -32,7 +37,8 @@ How to answer from records
 - Keep what was decided apart from what was discussed but not decided. Something is decided only when the record shows agreement or a clear call. If the question asks for a decision and none was made, say "This was discussed but nothing was decided" and quote where it was left.
 - Action items: owner, task, and due date as it was said ("by Friday"). If you turn a relative due date into a calendar date, say which day it counts from.
 - If speakers disagree, give each position with its speaker, and say which was final if the record says so.
-- If a topic came up on more than one day, answer as a dated timeline, oldest first, and say which is the latest.
+- A summary of a record lists every decision in it with its terms (lengths, amounts, conditions and what they were conditions for), then everything left open, then the action items. Go through the record from start to end so none is missed.
+- If a topic came up on more than one day, answer as a dated timeline, oldest first, and end with one line that names the latest day and what stands as of then, for example: "Latest: Thu 12 Nov, onboarding starts Monday."
 - A record marked partial="true" was too long to load whole: say your answer is based on part of it.
 - When you work out a number (a difference, a total), show the arithmetic.
 
@@ -61,21 +67,17 @@ export function buildPrompt({ retrieval, question, history, timezone, now }: Pro
   const today = todayIn(now, timezone);
   const memory = renderMemory(retrieval, timezone, today);
 
-  // Earlier turns are replayed as plain text, as they are stored. Gemini
-  // calls the assistant's role "model".
-  const contents: Content[] = history.map((message) => ({
-    role: message.role === "assistant" ? "model" : "user",
-    parts: [{ text: message.text }],
-  }));
-  contents.push({
+  // Earlier turns are replayed as plain text, as they are stored.
+  const messages: PromptMessage[] = history.map((message) => ({ role: message.role, content: message.text }));
+  messages.push({
     role: "user",
-    parts: [{ text: `${renderTurnContext(retrieval, timezone, now, today)}\n\n<question>\n${question}\n</question>` }],
+    content: `${renderTurnContext(retrieval, timezone, now, today)}\n\n<question>\n${question}\n</question>`,
   });
 
   // The memory changes only when records change, so rules plus memory form a
   // prefix the API can cache between questions. Everything that varies per
   // question is in the user turn.
-  return { system: `${RULES}\n\n${memory}`, contents };
+  return { system: `${RULES}\n\n${memory}`, messages };
 }
 
 // ---------------------------------------------------------------------------

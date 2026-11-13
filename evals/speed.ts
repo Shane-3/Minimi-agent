@@ -64,7 +64,8 @@ async function main(): Promise<void> {
         if (outOfQuota.has(model)) continue;
         const row: Row = { model, level, caseId: evalCase.id, outcome: "", firstText: null, total: null };
         try {
-          const result = await askCase(agents.get(`${model} ${level}`)!, store, evalCase);
+          // Recall cases only: no search, so the timings are the model's alone.
+          const result = await askCase(agents.get(`${model} ${level}`)!, store, evalCase, false);
           row.outcome = result.misses.length === 0 ? "pass" : `FAIL: ${result.misses.join("; ")}`;
           row.firstText = result.firstText;
           row.total = result.total;

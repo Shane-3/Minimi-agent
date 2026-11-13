@@ -1,89 +1,245 @@
 {
-  "description": "Fictional sample history for trying the agent. The people, companies and conversations are invented. Real products are named without prices; any price must come from a live search. Each record is anchored to the calendar ('when') so questions like 'On Monday...' and 'last Tuesday' find it on whatever day the sample is loaded. Weeks run Monday to Sunday.",
+  "description": "Fictional sample history for trying the agent. The people, companies and conversations are invented. Real products are named without prices; any price must come from a live search. Each record is anchored to the calendar ('when') so questions like 'On Monday...' and 'last Tuesday' find it on whatever day the sample is loaded. Weeks run Monday to Sunday. The 3 November chat (sample-postgres-prices-chat) is a real run of this agent made on 13 Nov 2026, stored word for word and placed on 3 November so the question 'What did I ask on 3 November?' has a record; its prices and sources are as the web showed them on 13 Nov 2026, which is why some sources are dated after 3 November.",
   "records": [
     {
       "id": "sample-acme-kickoff",
       "type": "meeting",
       "title": "Acme onboarding kickoff",
-      "when": { "mostRecent": "thursday", "weeksEarlier": 1 },
+      "when": {
+        "mostRecent": "thursday",
+        "weeksEarlier": 1
+      },
       "time": "11:00",
-      "participants": ["Shane", "Priya (Acme)", "Rahul"],
+      "participants": [
+        "Shane",
+        "Priya (Acme)",
+        "Rahul"
+      ],
       "turns": [
-        { "speaker": "Shane", "text": "Welcome, everyone. Today is about how onboarding for Acme will run." },
-        { "speaker": "Priya (Acme)", "text": "Our main worry is timing. We need the team using it before our year-end close." },
-        { "speaker": "Rahul", "text": "The data migration is the long part. It usually takes about three weeks once we have the export." },
-        { "speaker": "Priya (Acme)", "text": "Can we get the export to you this week?" },
-        { "speaker": "Shane", "text": "Yes, if your IT team sends it by Friday." },
-        { "speaker": "Priya (Acme)", "text": "We also want to ask for a 10% discount on the renewal." },
-        { "speaker": "Shane", "text": "I'll take that back to finance. I can't commit to it today." },
-        { "speaker": "Priya (Acme)", "text": "Understood. Let's settle the onboarding start date on next week's call." },
-        { "speaker": "Shane", "text": "Agreed. We'll decide the start date then." }
+        {
+          "speaker": "Shane",
+          "text": "Welcome, everyone. Today is about how onboarding for Acme will run."
+        },
+        {
+          "speaker": "Priya (Acme)",
+          "text": "Our main worry is timing. We need the team using it before our year-end close."
+        },
+        {
+          "speaker": "Rahul",
+          "text": "The data migration is the long part. It usually takes about three weeks once we have the export."
+        },
+        {
+          "speaker": "Priya (Acme)",
+          "text": "Can we get the export to you this week?"
+        },
+        {
+          "speaker": "Shane",
+          "text": "Yes, if your IT team sends it by Friday."
+        },
+        {
+          "speaker": "Priya (Acme)",
+          "text": "We also want to ask for a 10% discount on the renewal."
+        },
+        {
+          "speaker": "Shane",
+          "text": "I'll take that back to finance. I can't commit to it today."
+        },
+        {
+          "speaker": "Priya (Acme)",
+          "text": "Understood. Let's settle the onboarding start date on next week's call."
+        },
+        {
+          "speaker": "Shane",
+          "text": "Agreed. We'll decide the start date then."
+        }
       ]
     },
     {
       "id": "sample-postgres-hosting",
       "type": "meeting",
       "title": "Postgres hosting options",
-      "when": { "previousWeek": "tuesday" },
+      "when": {
+        "previousWeek": "tuesday"
+      },
       "time": "10:00",
-      "participants": ["Shane", "Rahul", "Meera"],
+      "participants": [
+        "Shane",
+        "Rahul",
+        "Meera"
+      ],
       "turns": [
-        { "speaker": "Rahul", "text": "The reporting service needs a managed Postgres database before we launch it." },
-        { "speaker": "Shane", "text": "Which providers are we looking at?" },
-        { "speaker": "Rahul", "text": "Three: Neon, Supabase and Amazon RDS." },
-        { "speaker": "Meera", "text": "I used Supabase on a side project and found it quick to set up." },
-        { "speaker": "Rahul", "text": "I'd rather stay close to our other AWS services, so I lean towards RDS." },
-        { "speaker": "Shane", "text": "We need to see what each would cost us before choosing. Rahul, can you check the current plans for all three by Friday?" },
-        { "speaker": "Rahul", "text": "Yes, by Friday." },
-        { "speaker": "Shane", "text": "So no decision yet. We pick a provider once we have the plans side by side." }
+        {
+          "speaker": "Rahul",
+          "text": "The reporting service needs a managed Postgres database before we launch it."
+        },
+        {
+          "speaker": "Shane",
+          "text": "Which providers are we looking at?"
+        },
+        {
+          "speaker": "Rahul",
+          "text": "Three: Neon, Supabase and Amazon RDS."
+        },
+        {
+          "speaker": "Meera",
+          "text": "I used Supabase on a side project and found it quick to set up."
+        },
+        {
+          "speaker": "Rahul",
+          "text": "I'd rather stay close to our other AWS services, so I lean towards RDS."
+        },
+        {
+          "speaker": "Shane",
+          "text": "We need to see what each would cost us before choosing. Rahul, can you check the current plans for all three by Friday?"
+        },
+        {
+          "speaker": "Rahul",
+          "text": "Yes, by Friday."
+        },
+        {
+          "speaker": "Shane",
+          "text": "So no decision yet. We pick a provider once we have the plans side by side."
+        }
       ]
     },
     {
       "id": "sample-acme-renewal",
       "type": "meeting",
       "title": "Acme renewal call",
-      "when": { "mostRecent": "thursday" },
+      "when": {
+        "mostRecent": "thursday"
+      },
       "time": "15:00",
-      "participants": ["Shane", "Priya (Acme)", "Rahul"],
+      "participants": [
+        "Shane",
+        "Priya (Acme)",
+        "Rahul"
+      ],
       "turns": [
-        { "speaker": "Shane", "text": "Thanks for making time. Last week we left the onboarding start date open." },
-        { "speaker": "Priya (Acme)", "text": "We've talked internally. We can sign the 12-month renewal if onboarding is finished within five weeks." },
-        { "speaker": "Rahul", "text": "The migration takes three weeks, so we'd need to start on Monday to leave time for training." },
-        { "speaker": "Shane", "text": "Then let's agree on that: onboarding starts Monday and finishes within five weeks." },
-        { "speaker": "Priya (Acme)", "text": "Agreed. We'll sign on that basis." },
-        { "speaker": "Priya (Acme)", "text": "We'd also like to add 15 seats, going from 40 to 55." },
-        { "speaker": "Shane", "text": "That works. I'll send the updated order form by Monday." },
-        { "speaker": "Priya (Acme)", "text": "On the 10% discount, my finance lead still wants it." },
-        { "speaker": "Shane", "text": "I can't approve that today. I'll check with our finance team and come back to you." },
-        { "speaker": "Priya (Acme)", "text": "Fine. Then the discount stays open for now." },
-        { "speaker": "Rahul", "text": "I'll share the migration checklist with Priya's team by Tuesday." }
+        {
+          "speaker": "Shane",
+          "text": "Thanks for making time. Last week we left the onboarding start date open."
+        },
+        {
+          "speaker": "Priya (Acme)",
+          "text": "We've talked internally. We can sign the 12-month renewal if onboarding is finished within five weeks."
+        },
+        {
+          "speaker": "Rahul",
+          "text": "The migration takes three weeks, so we'd need to start on Monday to leave time for training."
+        },
+        {
+          "speaker": "Shane",
+          "text": "Then let's agree on that: onboarding starts Monday and finishes within five weeks."
+        },
+        {
+          "speaker": "Priya (Acme)",
+          "text": "Agreed. We'll sign on that basis."
+        },
+        {
+          "speaker": "Priya (Acme)",
+          "text": "We'd also like to add 15 seats, going from 40 to 55."
+        },
+        {
+          "speaker": "Shane",
+          "text": "That works. I'll send the updated order form by Monday."
+        },
+        {
+          "speaker": "Priya (Acme)",
+          "text": "On the 10% discount, my finance lead still wants it."
+        },
+        {
+          "speaker": "Shane",
+          "text": "I can't approve that today. I'll check with our finance team and come back to you."
+        },
+        {
+          "speaker": "Priya (Acme)",
+          "text": "Fine. Then the discount stays open for now."
+        },
+        {
+          "speaker": "Rahul",
+          "text": "I'll share the migration checklist with Priya's team by Tuesday."
+        }
       ]
     },
     {
       "id": "sample-support-interviews",
       "type": "note",
       "title": "Support lead interviews",
-      "when": { "mostRecent": "friday" },
+      "when": {
+        "mostRecent": "friday"
+      },
       "time": "18:30",
-      "participants": ["Shane"],
+      "participants": [
+        "Shane"
+      ],
       "content": "Spoke with two candidates for the support lead role today.\n\nAnita has run a support team of six before and prefers the European shift.\n\nLeo is earlier in his career but knows the product well from a year as a customer.\n\nNext step: second interviews for both with Meera next week. No offer decided yet."
     },
     {
       "id": "sample-crm-shortlist",
       "type": "meeting",
       "title": "CRM shortlist review",
-      "when": { "mostRecent": "monday" },
+      "when": {
+        "mostRecent": "monday"
+      },
       "time": "14:00",
-      "participants": ["Shane", "Meera", "Rahul"],
+      "participants": [
+        "Shane",
+        "Meera",
+        "Rahul"
+      ],
       "turns": [
-        { "speaker": "Shane", "text": "We need to replace the spreadsheet pipeline before the new year. Let's narrow the list." },
-        { "speaker": "Meera", "text": "From the demos, I'd keep five: HubSpot, Pipedrive, Zoho CRM, Freshsales and Salesforce." },
-        { "speaker": "Rahul", "text": "Agreed on those five. I'd drop the rest." },
-        { "speaker": "Shane", "text": "Then the shortlist is those five. That's decided." },
-        { "speaker": "Meera", "text": "I'll collect current pricing for each of them by Friday, for a team of 12." },
-        { "speaker": "Rahul", "text": "My vote is Pipedrive. Our sales team found it the easiest to learn during the trial." },
-        { "speaker": "Meera", "text": "I lean towards HubSpot, because our marketing team already uses it." },
-        { "speaker": "Shane", "text": "Let's not pick one today. We'll compare once Meera has the pricing." }
+        {
+          "speaker": "Shane",
+          "text": "We need to replace the spreadsheet pipeline before the new year. Let's narrow the list."
+        },
+        {
+          "speaker": "Meera",
+          "text": "From the demos, I'd keep five: HubSpot, Pipedrive, Zoho CRM, Freshsales and Salesforce."
+        },
+        {
+          "speaker": "Rahul",
+          "text": "Agreed on those five. I'd drop the rest."
+        },
+        {
+          "speaker": "Shane",
+          "text": "Then the shortlist is those five. That's decided."
+        },
+        {
+          "speaker": "Meera",
+          "text": "I'll collect current pricing for each of them by Friday, for a team of 12."
+        },
+        {
+          "speaker": "Rahul",
+          "text": "My vote is Pipedrive. Our sales team found it the easiest to learn during the trial."
+        },
+        {
+          "speaker": "Meera",
+          "text": "I lean towards HubSpot, because our marketing team already uses it."
+        },
+        {
+          "speaker": "Shane",
+          "text": "Let's not pick one today. We'll compare once Meera has the pricing."
+        }
+      ]
+    },
+    {
+      "id": "sample-postgres-prices-chat",
+      "type": "chat",
+      "title": "Postgres hosting prices",
+      "when": {
+        "date": "11-03"
+      },
+      "time": "16:30",
+      "turns": [
+        {
+          "speaker": "user",
+          "text": "What do Neon, Supabase and Amazon RDS currently charge for a small managed Postgres database?"
+        },
+        {
+          "speaker": "assistant",
+          "text": "At Tue 27 Oct the team had no prices yet — the call was to compare plans before choosing:\n\n> **Shane (Postgres hosting options, Tue 27 Oct):** \"We need to see what each would cost us before choosing. Rahul, can you check the current plans for all three by Friday?\"\n> **Shane (Postgres hosting options, Tue 27 Oct):** \"So no decision yet. We pick a provider once we have the plans side by side.\"\n\nCurrent pricing for a small managed Postgres database (no stored old value to compare against):\n\n**Neon**: No announced change found since 27 Oct (no stored value to compare with). Usage-based with no monthly minimum on paid plans. Free: $0, 0.5 GB storage + 100 compute-hours/month. Launch: $0.106/CU-hour + $0.35/GB-month, \"Typical spend: $15 /mo\" (official, [neon.com/pricing](https://neon.com/pricing), checked Tue 3 Nov). Illustrative small-workload bills: side project with scale-to-zero ≈ $1.50/mo; always-on 1 vCPU/4 GB ≈ $78.07/mo ([makerkit.dev, 21 May 2026](https://makerkit.dev/pricing-calculator/neon)).\n\n**Supabase**: No announced change found since 27 Oct (no stored value to compare with). Free: $0/mo with usage limits. Pro: $25/mo subscription; compute billed hourly at the instance size you pick — paid plans include $10/month in compute credits covering one Micro instance (official, [supabase.com/pricing](https://supabase.com/pricing), checked Tue 3 Nov). A third-party guide adds 8 GB database included on Pro, then $0.125/GB ([metacto.com, 12 Jan 2026](https://www.metacto.com/blogs/the-true-cost-of-supabase-a-comprehensive-guide-to-pricing-integration-and-maintenance)).\n\n**Amazon RDS**: Couldn't verify the exact smallest-instance price from these results — on-demand pricing per instance type is region-dependent (official, [aws.amazon.com/rds/postgresql/pricing](https://aws.amazon.com/rds/postgresql/pricing), checked Tue 3 Nov). For scale: the AWS blog lists db.m6g.xlarge (4 vCPU) PostgreSQL at $0.318/hr ≈ $232.14/mo on-demand ([aws.amazon.com/blogs, 12 Nov 2026](https://aws.amazon.com/blogs/database/boosting-amazon-rds-with-aws-graviton5-benchmarks)); smaller t-class instances cost less by the hour, and new AWS accounts get a free tier for eligible instance sizes ([docs.aws.amazon.com, 5 Nov 2026](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_GettingStarted.CreatingConnecting.PostgreSQL.html)). Cautions: T-class instances bill CPU credits at $0.075/vCPU-hour above baseline (official pricing page), and RDS Extended Support is priced per vCPU-hour.\n\nSo for a small, low-traffic reporting database: Neon's free tier and Supabase Pro (~$25/mo all-in) are the cheapest starting points, with RDS smallest instance price dependent on the region you pick."
+        }
       ]
     }
   ]

@@ -1,8 +1,10 @@
-// npm run eval [--reasoning none|low|medium|high] [case numbers...]
+// npm run eval [--reasoning none|low|medium|high] [--show] [case numbers...]
 // Runs the eval cases against the sample history with real model calls,
 // through the same retrieval, prompt and loop the chat route uses.
 // --reasoning overrides the configured per-model setting, for tuning it.
+// --show prints every answer, not only the ones that fail.
 import { AgentError, createAgent } from "../server/agent/loop.ts";
+import { createWebSearch } from "../server/agent/search.ts";
 import type { ReasoningEffort } from "../server/config.ts";
 import { evalCases } from "./cases.ts";
 import { askCase, evalEnv, sampleHistory, TIMEZONE, type CaseAnswer } from "./setup.ts";
@@ -13,8 +15,10 @@ const CALL_GAP_MS = 13_000;
 
 async function main(): Promise<void> {
   const env = evalEnv();
-  const { reasoning, caseIds } = parseArgs(process.argv.slice(2));
-  const agent = createAgent({ apiKey: env.cerebrasKey, models: env.models, reasoning });
+  const { reasoning, show, caseIds } = parseArgs(process.argv.slice(2));
+  const webSearch = env.tavilyKey === null ? undefined : createWebSearch({ apiKey: env.tavilyKey });
+  const searchAvailable = webSearch !== undefined;
+  const agent = createAgent({ apiKey: env.cerebrasKey, models: env.models, reasoning, ...(webSearch ? { webSearch } : {}) });
   const { store, context, today } = sampleHistory(new Date());
 
   const only = new Set(caseIds);
@@ -29,7 +33,7 @@ async function main(): Promise<void> {
     let result: CaseAnswer;
     try {
       try {
-        result = await askCase(agent, store, evalCase);
+        result = await askCase(agent, store, evalCase, searchAvailable);
       } catch (error) {
         // Out of requests for the day: every later case would fail the same
         // way and say nothing about the answers, so stop here.
@@ -43,7 +47,7 @@ async function main(): Promise<void> {
         if (!(error instanceof AgentError && error.code === "rate_limited")) throw error;
         console.log(`     ${evalCase.id}. rate limited; waiting ${RATE_LIMIT_WAIT_MS / 1000}s and asking again`);
         await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_WAIT_MS));
-        result = await askCase(agent, store, evalCase);
+        result = await askCase(agent, store, evalCase, searchAvailable);
       }
     } catch (error) {
       failed += 1;
@@ -57,9 +61,12 @@ async function main(): Promise<void> {
     // The pool may move to another model, so each result says which one
     // answered: a weaker model failing a case reads differently.
     const first = result.firstText === null ? "-" : `${result.firstText.toFixed(1)}s`;
-    const timing = `${result.model}, first text ${first}, done ${result.total.toFixed(1)}s`;
+    const searched = result.searches > 0 ? `, ${result.searches} search${result.searches === 1 ? "" : "es"}` : "";
+    const timing = `${result.model}, first text ${first}, done ${result.total.toFixed(1)}s${searched}`;
     if (result.misses.length === 0) {
       console.log(`PASS ${evalCase.id}. ${evalCase.name} (${timing})`);
+      if (show) console.log(`  answer:
+${result.answer.replace(/^/gm, "    ")}`);
     } else {
       failed += 1;
       console.log(`FAIL ${evalCase.id}. ${evalCase.name} (${timing})`);
@@ -76,11 +83,14 @@ async function main(): Promise<void> {
 
 const EFFORTS: ReasoningEffort[] = ["none", "low", "medium", "high"];
 
-function parseArgs(args: string[]): { reasoning: ReasoningEffort | undefined; caseIds: number[] } {
+function parseArgs(args: string[]): { reasoning: ReasoningEffort | undefined; show: boolean; caseIds: number[] } {
   let reasoning: ReasoningEffort | undefined;
+  let show = false;
   const caseIds: number[] = [];
   for (let index = 0; index < args.length; index += 1) {
-    if (args[index] === "--reasoning") {
+    if (args[index] === "--show") {
+      show = true;
+    } else if (args[index] === "--reasoning") {
       reasoning = EFFORTS.find((effort) => effort === args[index + 1]);
       if (reasoning === undefined) throw new Error(`--reasoning takes one of ${EFFORTS.join(", ")}`);
       index += 1;
@@ -88,7 +98,7 @@ function parseArgs(args: string[]): { reasoning: ReasoningEffort | undefined; ca
       caseIds.push(Number(args[index]));
     }
   }
-  return { reasoning, caseIds };
+  return { reasoning, show, caseIds };
 }
 
 main().catch((error: unknown) => {

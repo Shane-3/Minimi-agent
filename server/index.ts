@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import { createAgent } from "./agent/loop.ts";
+import { createWebSearch } from "./agent/search.ts";
 import { createApi } from "./api.ts";
 import { DATABASE_PATH, SAMPLE_PATH } from "./config.ts";
 import { EnvError, missingKeyMessages, readEnv } from "./env.ts";
@@ -33,7 +34,11 @@ async function main(): Promise<void> {
   const app = express();
   const server = http.createServer(app);
 
-  const agent = env.cerebrasKey === null ? null : createAgent({ apiKey: env.cerebrasKey, models: env.models });
+  // Without a Tavily key the model is simply offered no tool, and the prompt
+  // tells it web search is off; questions about records still work.
+  const webSearch = env.tavilyKey === null ? undefined : createWebSearch({ apiKey: env.tavilyKey });
+  const agent =
+    env.cerebrasKey === null ? null : createAgent({ apiKey: env.cerebrasKey, models: env.models, ...(webSearch ? { webSearch } : {}) });
   app.use("/api", createApi({ env, store, samplePath: SAMPLE_PATH, agent }));
 
   // Vite runs inside Express so there is one process and one port. Its

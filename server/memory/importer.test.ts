@@ -361,6 +361,7 @@ describe("prepareSample", () => {
       ["sample-acme-renewal", "sample", "2026-11-05T09:30:00.000Z"], // Thu 5 Nov, 15:00
       ["sample-support-interviews", "sample", "2026-11-06T13:00:00.000Z"], // Fri 6 Nov, 18:30
       ["sample-crm-shortlist", "sample", "2026-11-09T08:30:00.000Z"], // Mon 9 Nov, 14:00
+      ["sample-postgres-prices-chat", "sample", "2026-11-03T11:00:00.000Z"], // Tue 3 Nov, 16:30
     ]);
     // The sample is meant to be read in the user's zone, so no warning.
     expect(assumedTimezone).toBe(0);
@@ -445,15 +446,15 @@ describe("loadSampleInto", () => {
 
   it("keeps one copy of the sample when loaded twice on the same day", () => {
     load("2026-11-11T06:00:00Z");
-    expect(load("2026-11-11T06:00:00Z")).toMatchObject({ imported: 5, skipped: 0, warnings: [] });
-    expect(store.listRecords()).toHaveLength(5);
+    expect(load("2026-11-11T06:00:00Z")).toMatchObject({ imported: 6, skipped: 0, warnings: [] });
+    expect(store.listRecords()).toHaveLength(6);
   });
 
   it("moves the sample to new dates when loaded on a later day, instead of adding a second copy", () => {
     load("2026-11-11T06:00:00Z");
     load("2026-11-18T06:00:00Z");
     const records = store.listRecords();
-    expect(records).toHaveLength(5);
+    expect(records).toHaveLength(6);
     expect(records.find((record) => record.id === "sample-crm-shortlist")?.startedAt).toBe("2026-11-16T08:30:00.000Z");
     // The old copy's text is gone from search too: Pipedrive is named in two
     // segments of one copy, so two hits, not four.
@@ -474,7 +475,7 @@ describe("loadSampleInto", () => {
     importInto(store, prepareImport([meeting()], KOLKATA), KOLKATA);
     load("2026-11-11T06:00:00Z");
     load("2026-11-11T06:00:00Z");
-    expect(store.listRecords()).toHaveLength(6);
+    expect(store.listRecords()).toHaveLength(7);
   });
 });
 

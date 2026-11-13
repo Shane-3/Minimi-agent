@@ -105,14 +105,19 @@ export interface MemoryChip {
   startedAt: string;
 }
 
+/** A web page an answer links to, listed under it: site, title and date. */
+export type Source = Pick<Evidence, "title" | "url" | "site" | "publishedDate" | "official">;
+
 /**
  * Events on the chat stream, sent as `data: <json>` lines. `type` says which.
- * Sources and checks are added with web search and the grounding check.
+ * Checks are added with the grounding check.
  */
 export type ChatEvent =
   | { type: "status"; text: string }
   | { type: "memory"; records: MemoryChip[] }
   | { type: "delta"; text: string }
+  /** The web pages the answer links to, sent once the answer is complete. */
+  | { type: "sources"; sources: Source[] }
   | { type: "error"; code: string; message: string; retryable: boolean; threadId: string }
   /** messageId is null when the answer could not be saved. */
   | { type: "done"; messageId: number | null; threadId: string };

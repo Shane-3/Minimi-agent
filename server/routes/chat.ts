@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { ChatEvent, ThreadMessage } from "../../shared/types.ts";
 import { AgentError, type Agent } from "../agent/loop.ts";
 import { buildPrompt } from "../agent/prompt.ts";
-import { chipsFor, FIRST_STATUS, statusFor } from "../agent/status.ts";
+import { chipsFor, FIRST_STATUS, sourcesFor, statusFor } from "../agent/status.ts";
 import { MESSAGE_MAX_CHARS } from "../config.ts";
 import { parseBody, sendError } from "../http.ts";
 import { isValidTimeZone } from "../memory/dates.ts";
@@ -16,6 +16,8 @@ export interface ChatRouteOptions {
   store: Store;
   /** Null when CEREBRAS_API_KEY is not set. */
   agent: Agent | null;
+  /** Whether the agent was given web_search (TAVILY_API_KEY is set); the prompt's rules depend on it. */
+  searchAvailable: boolean;
   /** Injected so tests can fix the time. */
   now?: () => Date;
 }
@@ -26,7 +28,7 @@ const chatBody = z.object({
   timezone: z.string().refine(isValidTimeZone, { error: "is not a timezone this server recognises" }),
 });
 
-export function chatRoutes({ store, agent, now = () => new Date() }: ChatRouteOptions): Router {
+export function chatRoutes({ store, agent, searchAvailable, now = () => new Date() }: ChatRouteOptions): Router {
   const router = Router();
 
   router.post("/chat", async (req, res) => {
@@ -77,12 +79,17 @@ export function chatRoutes({ store, agent, now = () => new Date() }: ChatRouteOp
         history,
         timezone: body.timezone,
         now: askedAt,
+        searchAvailable,
       });
       const result = await agent.answer({
         ...prompt,
         signal: stream.signal,
         onText: (text) => stream.send({ type: "delta", text }),
+        onStatus: (text) => stream.send({ type: "status", text }),
       });
+
+      const sources = sourcesFor(result.evidence, result.text);
+      if (sources.length > 0) stream.send({ type: "sources", sources });
 
       if (result.stopReason === "max_tokens") {
         // Cut off: kept on screen but not saved as a complete answer.

@@ -1,6 +1,6 @@
 // What the user sees while the answer is being prepared: a status line in
 // plain words and chips for the records the answer draws on.
-import type { MemoryChip } from "../../shared/types.ts";
+import type { Evidence, MemoryChip, Source } from "../../shared/types.ts";
 import { formatDay, partsInZone, todayIn } from "../memory/dates.ts";
 import type { Retrieval } from "../memory/retrieve.ts";
 
@@ -21,4 +21,15 @@ export function statusFor(retrieval: Retrieval, timezone: string, now: Date): st
 
 export function chipsFor(retrieval: Retrieval): MemoryChip[] {
   return retrieval.focus.map(({ id, title, type, startedAt }) => ({ id, title, type, startedAt }));
+}
+
+/**
+ * The pages to list under an answer: those it links to, in the order the
+ * search ranked them. Pages the search returned but the answer did not use
+ * are left out, so the list shows what the answer rests on.
+ */
+export function sourcesFor(evidence: Evidence[], answer: string): Source[] {
+  return evidence
+    .filter((page) => answer.includes(page.url))
+    .map(({ title, url, site, publishedDate, official }) => ({ title, url, site, publishedDate, official }));
 }

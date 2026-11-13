@@ -203,23 +203,13 @@ describe("resolveDates: timezones", () => {
 const WEDNESDAY_EARLY = new Date("2026-11-11T05:00:00Z");
 
 describe("the sample's questions, asked on every day of the week", () => {
-  // The sample plus a 3 November record. The real 3 November record is added
-  // with step 7; this one stands in for it with the same anchor.
-  const sample = JSON.parse(readFileSync(new URL("../../data/sample.json", import.meta.url), "utf8")) as {
-    records: unknown[];
-  };
-  const withNovemberThird = {
-    records: [
-      ...sample.records,
-      { id: "sample-nov-3", type: "chat", title: "Stand-in", when: { date: "11-03" }, time: "16:00", content: "Hi." },
-    ],
-  };
+  const sample = JSON.parse(readFileSync(new URL("../../data/sample.json", import.meta.url), "utf8")) as unknown;
 
   it.each(["2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14", "2026-11-15"])(
     "on %s, each question finds exactly its record",
     (today) => {
       const now = new Date(`${today}T06:00:00Z`);
-      const records = prepareSample(withNovemberThird, KOLKATA, now).records;
+      const records = prepareSample(sample, KOLKATA, now).records;
       const found = (question: string) => {
         const [date] = resolveDates(question, KOLKATA, now);
         if (date === undefined) return [];
@@ -229,13 +219,14 @@ describe("the sample's questions, asked on every day of the week", () => {
       };
 
       expect(found("On Monday we shortlisted 5 CRM tools. Has pricing changed?")).toEqual(["sample-crm-shortlist"]);
+      // In that week, last Tuesday is 3 November: the Postgres meeting and the 3 November chat.
       expect(found("What did we decide about Postgres hosting last Tuesday?")).toEqual([
         "sample-postgres-hosting",
-        "sample-nov-3",
+        "sample-postgres-prices-chat",
       ]);
       expect(found("What did I ask on 3 November? Is it still correct?")).toEqual([
         "sample-postgres-hosting",
-        "sample-nov-3",
+        "sample-postgres-prices-chat",
       ]);
     },
   );

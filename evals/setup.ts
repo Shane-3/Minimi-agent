@@ -66,13 +66,15 @@ export interface CaseAnswer {
   total: number;
   /** Names of the checks the answer missed; empty when it passed. */
   misses: string[];
+  /** How many web_search calls the agent made. */
+  searches: number;
 }
 
 /** Asks one case through the same retrieval, prompt and loop the chat route uses. Throws what the agent throws. */
-export async function askCase(agent: Agent, store: Store, evalCase: EvalCase): Promise<CaseAnswer> {
+export async function askCase(agent: Agent, store: Store, evalCase: EvalCase, searchAvailable: boolean): Promise<CaseAnswer> {
   const asked = new Date();
   const retrieval = retrieve(store, evalCase.question, { timezone: TIMEZONE, now: asked });
-  const prompt = buildPrompt({ retrieval, question: evalCase.question, history: [], timezone: TIMEZONE, now: asked });
+  const prompt = buildPrompt({ retrieval, question: evalCase.question, history: [], timezone: TIMEZONE, now: asked, searchAvailable });
 
   const started = performance.now();
   let firstText: number | null = null;
@@ -88,6 +90,11 @@ export async function askCase(agent: Agent, store: Store, evalCase: EvalCase): P
     model: result.model,
     firstText: firstText === null ? null : seconds(firstText),
     total: seconds(performance.now()),
-    misses: evalCase.checks.filter((check) => !check.pass(result.text)).map((check) => check.name),
+    misses: [
+      ...evalCase.checks.filter((check) => !check.pass(result.text)).map((check) => check.name),
+      // A re-check case must actually search: an answer from the model's own knowledge fails F11.
+      ...(evalCase.needsSearch === true && result.searches === 0 ? ["searched the web"] : []),
+    ],
+    searches: result.searches,
   };
 }

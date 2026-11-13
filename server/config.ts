@@ -59,6 +59,22 @@ export const RECALL_REASONING: { [model: string]: ReasoningEffort } = {
 };
 export const RECALL_REASONING_DEFAULT: ReasoningEffort = "medium";
 
+/**
+ * Reasoning once search results are in: weighing old against new values,
+ * conflicting sources and dates is where an error is most costly, and
+ * accuracy comes before speed.
+ */
+export const SEARCH_REASONING: ReasoningEffort = "high";
+
+/**
+ * When the model may still call web_search, the start of its text is held
+ * back until this many characters arrive or the call ends. If a search
+ * request follows, the held text was a preamble ("Let me check...") and is
+ * dropped, so the answer is not written twice. At Cerebras speeds this
+ * delays a direct answer by a fraction of a second.
+ */
+export const TOOL_PREAMBLE_HOLD_CHARS = 500;
+
 /** How long a model rests after a per-minute limit, when the API gives no delay. */
 export const MODEL_REST_AFTER_MINUTE_LIMIT_MS = 60_000;
 /** How long a model rests after its daily limit, when the API gives no delay; checked again after that. */

@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { ApiError, ChatEvent, ThreadMessage } from "../../shared/types.ts";
+import type { ApiError, ChatEvent, Evidence, ThreadMessage } from "../../shared/types.ts";
 import { AgentError, type Agent, type AnswerRequest } from "../agent/loop.ts";
 import { createApi } from "../api.ts";
 import { Store } from "../memory/store.ts";
@@ -14,14 +14,16 @@ const NOW = new Date("2026-11-11T06:00:00Z");
 
 /** A stand-in agent that records each request and plays a scripted reply. */
 function fakeAgent(
-  reply: (request: AnswerRequest) => Promise<{ text: string; stopReason?: "end_turn" | "max_tokens" }>,
+  reply: (
+    request: AnswerRequest,
+  ) => Promise<{ text: string; stopReason?: "end_turn" | "max_tokens"; evidence?: Evidence[]; searches?: number }>,
 ) {
   const requests: AnswerRequest[] = [];
   const agent: Agent = {
     async answer(request) {
       requests.push(request);
-      const { text, stopReason = "end_turn" } = await reply(request);
-      return { text, stopReason, model: "test-model" };
+      const { text, stopReason = "end_turn", evidence = [], searches = 0 } = await reply(request);
+      return { text, stopReason, model: "test-model", evidence, searches };
     },
   };
   return { agent, requests };
@@ -91,6 +93,38 @@ describe("POST /api/chat", () => {
     expect(events[0]).toEqual({ type: "status", text: "Looking through your records" });
     expect(events[1]).toMatchObject({ type: "memory", records: [{ id: "sample-crm-shortlist", title: "CRM shortlist review" }] });
     expect(events[2]).toEqual({ type: "status", text: "Reading CRM shortlist review · Mon 9 Nov" });
+  });
+
+  it("passes on the agent's search status, and lists the sources the answer links to", async () => {
+    const used: Evidence = {
+      title: "Example pricing",
+      url: "https://example.com/pricing",
+      site: "example.com",
+      publishedDate: "2026-11-10",
+      snippet: "Plan details.",
+      official: true,
+    };
+    const unused: Evidence = { ...used, title: "Other page", url: "https://other.example.org/page", official: false };
+    await start(
+      fakeAgent(async (request) => {
+        request.onStatus?.("Checking example.com");
+        const text = "**Example**: no announced change found. ([example.com](https://example.com/pricing), Tue 10 Nov)";
+        request.onText(text);
+        return { text, evidence: [used, unused], searches: 1 };
+      }).agent,
+    );
+    const events = await ask({ message: "Has Example changed its pricing?" });
+    expect(events).toContainEqual({ type: "status", text: "Checking example.com" });
+    expect(events.find((event) => event.type === "sources")).toEqual({
+      type: "sources",
+      sources: [{ title: "Example pricing", url: "https://example.com/pricing", site: "example.com", publishedDate: "2026-11-10", official: true }],
+    });
+    expect(types(events).slice(-2)).toEqual(["sources", "done"]);
+  });
+
+  it("sends no sources event for an answer that links to none", async () => {
+    await start(fakeAgent(streams(["From the records."])).agent);
+    expect(types(await ask({ message: "What did we decide?" }))).not.toContain("sources");
   });
 
   it("saves the question and the answer as a chat that can be reloaded and recalled", async () => {

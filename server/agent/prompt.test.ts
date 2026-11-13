@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { importInto, loadSampleInto, prepareImport, prepareSample } from "../memory/importer.ts";
 import { retrieve } from "../memory/retrieve.ts";
 import { Store } from "../memory/store.ts";
-import { buildPrompt, RULES } from "./prompt.ts";
+import { buildPrompt, rulesFor } from "./prompt.ts";
+
+const RULES = rulesFor(true);
 
 const KOLKATA = "Asia/Kolkata";
 // Wednesday 11 November 2026, 11:30 in Kolkata.
@@ -22,7 +24,7 @@ afterEach(() => {
 
 function promptFor(question: string, budgetTokens?: number) {
   const retrieval = retrieve(store, question, { timezone: KOLKATA, now: NOW, budgetTokens });
-  return buildPrompt({ retrieval, question, history: [], timezone: KOLKATA, now: NOW });
+  return buildPrompt({ retrieval, question, history: [], timezone: KOLKATA, now: NOW, searchAvailable: true });
 }
 
 // The system instruction is the rules, a blank line, then the memory.
@@ -41,6 +43,23 @@ describe("buildPrompt: system", () => {
     expect(promptFor("On Monday we shortlisted 5 CRM tools").system).toBe(
       promptFor("What did we decide about the Acme discount?").system,
     );
+  });
+
+  it("tells the model how to re-check facts when search is set up", () => {
+    const rules = rulesFor(true);
+    expect(rules).toContain("call web_search");
+    expect(rules).toContain("No announced change found since <date>");
+    expect(rules).toContain("Couldn't verify");
+    expect(rules).toContain("An undated source cannot show that something changed since a date.");
+    expect(rules).not.toContain("Web search is not set up");
+  });
+
+  it("tells the model web search is off when it is not set up", () => {
+    const rules = rulesFor(false);
+    expect(rules).toContain("Web search is not set up on this server.");
+    expect(rules).not.toContain("web_search");
+    // The record rules are the same either way.
+    expect(rules.slice(0, 400)).toBe(rulesFor(true).slice(0, 400));
   });
 
   it("says when nothing is stored", () => {
@@ -118,7 +137,7 @@ describe("buildPrompt: the question's context", () => {
   it("gives the time, the stored range and the question last", () => {
     const turn = turnOf(promptFor("On Monday we shortlisted 5 CRM tools"));
     expect(turn).toContain("Now: Wed 11 Nov 2026, 11:30 (Asia/Kolkata)");
-    expect(turn).toContain("Records stored: 5, from Thu 29 Oct to Mon 9 Nov");
+    expect(turn).toContain("Records stored: 6, from Thu 29 Oct to Mon 9 Nov");
     expect(turn.endsWith("<question>\nOn Monday we shortlisted 5 CRM tools\n</question>")).toBe(true);
   });
 
@@ -152,6 +171,7 @@ describe("buildPrompt: conversation history", () => {
   it("replays earlier turns before the new question", () => {
     const retrieval = retrieve(store, "And after that?", { timezone: KOLKATA, now: NOW });
     const prompt = buildPrompt({
+      searchAvailable: true,
       retrieval,
       question: "And after that?",
       history: [

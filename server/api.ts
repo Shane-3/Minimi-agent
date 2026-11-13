@@ -30,7 +30,7 @@ export function createApi({ env, store, samplePath, agent, now }: ApiOptions): R
   });
 
   api.use(importRoutes({ store, samplePath, now }));
-  api.use(chatRoutes({ store, agent, now }));
+  api.use(chatRoutes({ store, agent, searchAvailable: env.tavilyKey !== null, now }));
 
   // Unknown API paths answer in the shared error shape instead of falling
   // through to Vite, which would return the HTML page.

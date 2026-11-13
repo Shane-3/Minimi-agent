@@ -59,13 +59,14 @@ describe("retrieve: when everything fits", () => {
     expect(loadedIds(result)).toEqual([
       "sample-acme-kickoff",
       "sample-postgres-hosting",
+      "sample-postgres-prices-chat",
       "sample-acme-renewal",
       "sample-support-interviews",
       "sample-crm-shortlist",
     ]);
     expect(result.loaded.every((loaded) => !loaded.partial)).toBe(true);
     expect(result.loaded.find((loaded) => loaded.record.id === "sample-crm-shortlist")?.record.segments).toHaveLength(8);
-    expect(result.index).toHaveLength(5);
+    expect(result.index).toHaveLength(6);
     expect(result.storedRange).toEqual({ from: "2026-10-29T05:30:00.000Z", to: "2026-11-09T08:30:00.000Z" });
   });
 
@@ -75,8 +76,9 @@ describe("retrieve: when everything fits", () => {
     expect(result.dates).toMatchObject([{ text: "On Monday", label: "Mon 9 Nov", recordIds: ["sample-crm-shortlist"] }]);
   });
 
-  it("finds last Tuesday's meeting", () => {
-    expect(focusIds(ask("What did we decide about Postgres hosting last Tuesday?"))).toEqual(["sample-postgres-hosting"]);
+  it("finds last Tuesday's records: the Postgres meeting and the Postgres prices chat", () => {
+    const focus = focusIds(ask("What did we decide about Postgres hosting last Tuesday?"));
+    expect(focus.sort()).toEqual(["sample-postgres-hosting", "sample-postgres-prices-chat"]);
   });
 
   it("focuses on keyword matches when the question has no date", () => {
@@ -124,18 +126,19 @@ describe("retrieve: when everything fits", () => {
         content: "The hiring budget for next quarter covers two support roles.",
       },
     ]);
-    expect(ask("What did we say about Postgres last Tuesday?").dates[0]?.recordIds).toEqual([
-      "sample-postgres-hosting",
-      expect.any(String),
-    ]);
+    // 3 November now holds the Postgres meeting, the sample's Postgres prices chat and this note.
+    const postgres = ask("What did we say about Postgres last Tuesday?").dates[0]?.recordIds ?? [];
+    expect(postgres).toHaveLength(3);
+    expect(postgres.slice(0, 2).sort()).toEqual(["sample-postgres-hosting", "sample-postgres-prices-chat"]);
     const hiring = ask("What about the hiring budget last Tuesday?");
-    expect(hiring.dates[0]?.recordIds).toHaveLength(2);
+    expect(hiring.dates[0]?.recordIds).toHaveLength(3);
     expect(hiring.focus[0]?.title).toBe("Hiring budget");
   });
 
   it("leaves out the live chat the question belongs to", () => {
     importRecords([{ timestamp: "2026-11-11T11:00:00+05:30", role: "user", content: "What did we decide about Acme?" }]);
-    const chatId = store.listRecords().find((record) => record.type === "chat")!.id;
+    // Found by title: the sample has a chat of its own.
+    const chatId = store.listRecords().find((record) => record.title === "What did we decide about Acme?")!.id;
     const result = ask("What did we decide about Acme?", undefined, chatId);
     expect(result.index.map((record) => record.id)).not.toContain(chatId);
     expect(loadedIds(result)).not.toContain(chatId);
@@ -151,15 +154,15 @@ describe("retrieve: over the budget", () => {
   it("loads the focus first and leaves the rest in the index", () => {
     loadSample();
     const everything = ask("anything").loaded.length;
-    expect(everything).toBe(5);
+    expect(everything).toBe(6);
 
-    // Room for about two of the five sample records.
+    // Room for about two of the short sample records. Loaded records are
+    // listed oldest first, so the check is that the focus is among them, whole.
     const result = ask("On Monday we shortlisted 5 CRM tools. Has pricing changed?", 400);
     expect(result.allLoaded).toBe(false);
-    expect(loadedIds(result)[0]).toBe("sample-crm-shortlist");
-    expect(result.loaded.length).toBeLessThan(5);
-    expect(result.loaded.every((loaded) => !loaded.partial)).toBe(true);
-    expect(result.index).toHaveLength(5);
+    expect(result.loaded.find((loaded) => loaded.record.id === "sample-crm-shortlist")?.partial).toBe(false);
+    expect(result.loaded.length).toBeLessThan(6);
+    expect(result.index).toHaveLength(6);
   });
 
   it("loads the most recent records when nothing matches", () => {

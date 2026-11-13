@@ -146,10 +146,10 @@ describe("API", () => {
     expect((await post("/import/sample", { timezone: KOLKATA })).status).toBe(200);
     now = new Date("2026-11-18T06:00:00Z");
     const second = (await (await post("/import/sample", { timezone: KOLKATA })).json()) as ImportResult;
-    expect(second).toMatchObject({ imported: 5, skipped: 0 });
+    expect(second).toMatchObject({ imported: 6, skipped: 0 });
 
     const records = (await (await fetch(`${base}/records`)).json()) as RecordSummary[];
-    expect(records).toHaveLength(5);
+    expect(records).toHaveLength(6);
     expect(records.find((record) => record.id === "sample-crm-shortlist")?.startedAt).toBe(
       "2026-11-16T08:30:00.000Z",
     );
@@ -170,7 +170,7 @@ describe("API", () => {
     await post("/import/sample", { timezone: KOLKATA });
     expect((await fetch(`${base}/records/sample-crm-shortlist`, { method: "DELETE" })).status).toBe(204);
     expect((await fetch(`${base}/records/sample-crm-shortlist`, { method: "DELETE" })).status).toBe(404);
-    expect(store.listRecords()).toHaveLength(4);
+    expect(store.listRecords()).toHaveLength(5);
 
     expect((await fetch(`${base}/records`, { method: "DELETE" })).status).toBe(204);
     expect(store.listRecords()).toEqual([]);

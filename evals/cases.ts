@@ -20,6 +20,8 @@ export interface EvalCase {
   name: string;
   question: string;
   checks: Check[];
+  /** The answer must come from a web search, not the model's own knowledge (F11). */
+  needsSearch?: boolean;
 }
 
 // The ways a correct answer says the records hold nothing on it. Widened
@@ -27,6 +29,13 @@ export interface EvalCase {
 // anything about", "none of them mention") were marked as failures.
 const NO_RECORD = /no record|nothing (?:is |was )?(?:recorded|stored|on|about)|(?:don't|do not) have (?:any )?(?:record|anything)|no (?:meeting|note|chat)s?|isn't (?:anything|any record)|there (?:is|are) no|not (?:in|mentioned in) (?:your|the|any) records|(?:do|does|did)(?: not|n't) (?:mention|contain|include|cover|say anything|have anything)|none (?:of (?:them|the|your|my)\b[^.]{0,60}? )?(?:mention|contain|include|cover)|no mention|not mentioned/i;
 const NOT_DECIDED = /nothing (?:was|has been) decided|no decision|not (?:yet )?decided|(?:wasn't|was not|hasn't been|has not been) decided|undecided|did(?:n't| not) decide/i;
+
+/** A per-claim status from the re-check contract (ARCHITECTURE.md §5). */
+const STATUS = /no announced change|\bchanged\b|couldn['’]t verify|could not verify|cannot verify|can't verify/i;
+/** A Markdown link to a web page. */
+const LINK = /\]\(https?:\/\//;
+/** A source's date, or the date an undated page was checked. */
+const SOURCE_DATE = /\b\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b|\b\d{4}-\d{2}-\d{2}\b|\bchecked\b|\bundated\b/i;
 
 export function evalCases(context: EvalContext): EvalCase[] {
   const grounded = numbersFrom(context.recordsText);
@@ -113,6 +122,36 @@ export function evalCases(context: EvalContext): EvalCase[] {
         contains("says there is no record", NO_RECORD),
         lacks("does not invent a decision", /decided to move|(?:we|you) (?:are|will be) moving|new office (?:is|will)/i),
         grounded,
+      ],
+    },
+    {
+      id: 8,
+      name: "Recall an earlier question, then re-check it",
+      question: "What did I ask on 3 November? Is it still correct?",
+      needsSearch: true,
+      checks: [
+        contains("recalls what was asked", /small managed Postgres|what (?:do|did) Neon|charge for a small/i),
+        // The earlier answer's own figure, from the stored chat: Supabase Pro at $25 a month.
+        contains("recalls what the answer said", /\$25\b/),
+        // One result per claim: a status, a linked source and a date near each provider.
+        ...["Neon", "Supabase", "RDS"].map((provider) =>
+          near(`${provider}: status, source and date`, new RegExp(provider, "i"), [STATUS, LINK, SOURCE_DATE]),
+        ),
+      ],
+    },
+    {
+      id: 9,
+      name: "Five shortlisted tools, pricing changes",
+      question: "On Monday we shortlisted 5 CRM tools. Has pricing changed for any of them?",
+      needsSearch: true,
+      checks: [
+        // One result per tool: a status, a linked source and a date near its name.
+        ...["HubSpot", "Pipedrive", "Zoho", "Freshsales", "Salesforce"].map((tool) =>
+          near(`${tool}: status, source and date`, new RegExp(tool, "i"), [STATUS, LINK, SOURCE_DATE]),
+        ),
+        // The records hold no prices, so nothing can be shown to have changed.
+        contains("says there is no stored price to compare", /no stored|not stored|no (?:recorded|saved|stored) (?:price|pricing|value|baseline)|no baseline|nothing (?:stored|recorded) to compare/i),
+        lacks("claims no change it cannot show", /\*\*[^*\n]+\*\*\s*:?\s*\**changed\b/i),
       ],
     },
   ];

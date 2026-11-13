@@ -407,7 +407,14 @@ function displayName(speaker: string): string {
 
 function sumsIn(text: string): { check: Check; resultStart: number; resultEnd: number }[] {
   const sums: { check: Check; resultStart: number; resultEnd: number }[] = [];
-  const pattern = /(\d[\d,]*(?:\.\d+)?)\s*([+\-×x*/÷])\s*(\d[\d,]*(?:\.\d+)?)\s*(?:=|≈|~)\s*((?:[$€£₹]\s?)?\d[\d,]*(?:\.\d+)?)/g;
+  // Amounts may carry a currency sign ("12 × $14 = $168"), and answers often
+  // put the result in bold ("= **$168**").
+  const number = String.raw`\d[\d,]*(?:\.\d+)?`;
+  const currency = String.raw`(?:[$€£₹]\s?)?`;
+  const pattern = new RegExp(
+    String.raw`${currency}(${number})\s*([+\-×x*/÷])\s*${currency}(${number})\s*(?:=|≈|~)\s*(?:\*\*|__)?(${currency}${number})`,
+    "g",
+  );
   for (const match of text.matchAll(pattern)) {
     const left = Number(match[1]!.replace(/,/g, ""));
     const right = Number(match[3]!.replace(/,/g, ""));

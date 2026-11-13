@@ -135,6 +135,20 @@ describe("checkAnswer: shown arithmetic", () => {
     expect(only(checks, "54")).toMatchObject({ verified: false, reason: BAD_ARITHMETIC });
   });
 
+  it("works out sums with currency signs and a bold result", () => {
+    const checks = check("12 seats: 12 × $14 = **$168**; 12 × $50 = $600; 12 × $9 = **$109**.", {
+      question: "What would 12 seats cost?",
+      evidence: [source("Plans: $14, $50 and $9 per user per month.")],
+    });
+    expect(only(checks, "$168")).toMatchObject({ verified: true });
+    expect(only(checks, "$600")).toMatchObject({ verified: true });
+    expect(only(checks, "$109")).toMatchObject({ verified: false, reason: BAD_ARITHMETIC });
+    expect(checks.filter((item) => item.text === "$14" || item.text === "$50")).toEqual([
+      expect.objectContaining({ verified: true }),
+      expect.objectContaining({ verified: true }),
+    ]);
+  });
+
   it("accepts a rounded result", () => {
     expect(only(check("Rows per hour: 9600 / 0.5 ≈ 19200."), "19200")).toMatchObject({ verified: true });
   });

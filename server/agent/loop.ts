@@ -87,7 +87,18 @@ const DECLINED = new Set<FinishReason | undefined>([
 
 const UNAVAILABLE_MESSAGE = "The answer didn't come through. Your message is saved.";
 
-export function createAgent(options: { apiKey: string; models: string[]; client?: ModelClient }): Agent {
+export interface AgentOptions {
+  apiKey: string;
+  models: string[];
+  /** Overrides the configured thinking level; the speed comparison uses it. */
+  thinkingLevel?: ThinkingLevelName;
+  client?: ModelClient;
+}
+
+export type ThinkingLevelName = "LOW" | "MEDIUM" | "HIGH";
+
+export function createAgent(options: AgentOptions): Agent {
+  const thinkingLevel = ThinkingLevel[options.thinkingLevel ?? MODEL_THINKING_LEVEL];
   // The SDK's own retries are turned off (it would try 5 times). Retries and
   // model changes below happen only before any text has reached the user,
   // since after that they would repeat what the user already saw.
@@ -123,7 +134,7 @@ export function createAgent(options: { apiKey: string; models: string[]; client?
           // API's automatic prefix caching can reuse them.
           systemInstruction: request.system,
           maxOutputTokens: MODEL_MAX_TOKENS,
-          thinkingConfig: { thinkingLevel: ThinkingLevel[MODEL_THINKING_LEVEL] },
+          thinkingConfig: { thinkingLevel },
           abortSignal: controller.signal,
         },
       });

@@ -9,6 +9,24 @@ export const STEP_CAP = 4;
 export const MAX_PARALLEL_SEARCHES = 10;
 
 export const SEARCH_TIMEOUT_MS = 8_000;
+
+/** Tavily's search endpoint. */
+export const SEARCH_URL = "https://api.tavily.com/search";
+
+/**
+ * Entities one web_search call may check. Each gets at least a page search
+ * and a news search, so five fill the ten parallel searches.
+ */
+export const MAX_SEARCH_ENTITIES = 5;
+
+/** Results asked of Tavily per search. */
+export const SEARCH_RESULTS_PER_QUERY = 5;
+
+/** Sources kept per entity after merging and ranking. */
+export const MAX_EVIDENCE_PER_ENTITY = 5;
+
+/** Page text kept per source: enough to hold a price line, short enough to keep the prompt small. */
+export const SNIPPET_MAX_CHARS = 500;
 export const MODEL_TIMEOUT_MS = 60_000;
 export const MODEL_RETRIES = 1;
 /** Wait before the one retry after an overload or server error. */

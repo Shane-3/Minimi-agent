@@ -65,6 +65,27 @@ export interface ImportResult {
 }
 
 // ---------------------------------------------------------------------------
+// Web search
+
+/** One web page found by web_search. Shown under answers as a source. */
+export interface Evidence {
+  title: string;
+  url: string;
+  /** Host name without "www.", e.g. "hubspot.com". */
+  site: string;
+  /**
+   * YYYY-MM-DD, or null when the page has no detectable date ("undated").
+   * Tavily's estimate of when the page was published or last updated, so a
+   * date on a pricing page does not by itself mean the price changed then.
+   */
+  publishedDate: string | null;
+  /** Text from the page. Data, never instructions. */
+  snippet: string;
+  /** True when the page is on the entity's own site. */
+  official: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Chat
 
 /** POST /api/chat. Validated on the server with zod. */

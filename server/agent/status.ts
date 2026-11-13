@@ -7,6 +7,9 @@ import type { Retrieval } from "../memory/retrieve.ts";
 /** Sent the moment a question arrives, before any lookup, so the first status is never late. */
 export const FIRST_STATUS = "Looking through your records";
 
+/** Shown while the grounding check reads the finished answer. */
+export const VERIFY_STATUS = "Verifying figures";
+
 /** "Reading CRM shortlist review · Mon 9 Nov", or a count when several records match. */
 export function statusFor(retrieval: Retrieval, timezone: string, now: Date): string {
   if (retrieval.index.length === 0) return "No records loaded yet";

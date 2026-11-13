@@ -105,6 +105,21 @@ export interface MemoryChip {
   startedAt: string;
 }
 
+/** What a grounding check looked at in an answer. */
+export type CheckKind = "figure" | "date" | "quote";
+
+/** One number, date or quote in an answer, checked against the records and sources. */
+export interface Check {
+  kind: CheckKind;
+  /** The exact text in the answer, e.g. "$25", "Mon 9 Nov" or the quoted words. */
+  text: string;
+  /** Where `text` starts in the answer, so the UI can mark it. */
+  start: number;
+  verified: boolean;
+  /** For an unverified item: why, in words shown in its tooltip. */
+  reason?: string;
+}
+
 /** A web page an answer links to, listed under it: site, title and date. */
 export type Source = Pick<Evidence, "title" | "url" | "site" | "publishedDate" | "official">;
 
@@ -118,6 +133,12 @@ export type ChatEvent =
   | { type: "delta"; text: string }
   /** The web pages the answer links to, sent once the answer is complete. */
   | { type: "sources"; sources: Source[] }
+  /**
+   * The grounding check of the finished answer. "unavailable" when the check
+   * itself failed: the answer stands, marked as unchecked.
+   */
+  | { type: "checks"; status: "done"; checks: Check[] }
+  | { type: "checks"; status: "unavailable" }
   | { type: "error"; code: string; message: string; retryable: boolean; threadId: string }
   /** messageId is null when the answer could not be saved. */
   | { type: "done"; messageId: number | null; threadId: string };

@@ -8,7 +8,7 @@ import { sendError } from "./http.ts";
 import { TOO_LARGE_MESSAGE } from "./memory/importer.ts";
 import type { Store } from "./memory/store.ts";
 import type { Agent } from "./agent/loop.ts";
-import { chatRoutes } from "./routes/chat.ts";
+import { chatRoutes, type ChatRouteOptions } from "./routes/chat.ts";
 import { importRoutes } from "./routes/import.ts";
 
 export interface ApiOptions {
@@ -18,9 +18,11 @@ export interface ApiOptions {
   /** Null when CEREBRAS_API_KEY is not set. */
   agent: Agent | null;
   now?: () => Date;
+  /** The grounding check; injected so tests can make it fail. */
+  check?: ChatRouteOptions["check"];
 }
 
-export function createApi({ env, store, samplePath, agent, now }: ApiOptions): Router {
+export function createApi({ env, store, samplePath, agent, now, check }: ApiOptions): Router {
   const api = Router();
   api.use(express.json({ limit: API_BODY_LIMIT }));
 
@@ -30,7 +32,7 @@ export function createApi({ env, store, samplePath, agent, now }: ApiOptions): R
   });
 
   api.use(importRoutes({ store, samplePath, now }));
-  api.use(chatRoutes({ store, agent, searchAvailable: env.tavilyKey !== null, now }));
+  api.use(chatRoutes({ store, agent, searchAvailable: env.tavilyKey !== null, now, check }));
 
   // Unknown API paths answer in the shared error shape instead of falling
   // through to Vite, which would return the HTML page.

@@ -3,7 +3,8 @@ import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { ApiError, ChatEvent, Evidence, ThreadMessage } from "../../shared/types.ts";
+import type { ApiError, ChatEvent, Check, Evidence, ThreadMessage } from "../../shared/types.ts";
+import type { GroundingInput } from "../agent/grounding.ts";
 import { AgentError, type Agent, type AnswerRequest } from "../agent/loop.ts";
 import { createApi } from "../api.ts";
 import { Store } from "../memory/store.ts";
@@ -40,7 +41,7 @@ let store: Store;
 let server: http.Server;
 let base: string;
 
-async function start(agent: Agent | null): Promise<void> {
+async function start(agent: Agent | null, check?: (input: GroundingInput) => Check[]): Promise<void> {
   const app = express();
   app.use(
     "/api",
@@ -50,6 +51,7 @@ async function start(agent: Agent | null): Promise<void> {
       samplePath: SAMPLE_PATH,
       agent,
       now: () => NOW,
+      check,
     }),
   );
   server = http.createServer(app);
@@ -84,15 +86,16 @@ async function ask(body: { message: string; threadId?: string }): Promise<ChatEv
 const types = (events: ChatEvent[]) => events.map((event) => event.type);
 
 describe("POST /api/chat", () => {
-  it("streams status, memory chips, the answer, then done", async () => {
+  it("streams status, memory chips, the answer, the check, then done", async () => {
     await start(fakeAgent(streams(["The shortlist ", "is five tools."])).agent);
     await post("/import/sample", { timezone: KOLKATA });
 
     const events = await ask({ message: "On Monday we shortlisted 5 CRM tools. What were they?" });
-    expect(types(events)).toEqual(["status", "memory", "status", "delta", "delta", "done"]);
+    expect(types(events)).toEqual(["status", "memory", "status", "delta", "delta", "status", "checks", "done"]);
     expect(events[0]).toEqual({ type: "status", text: "Looking through your records" });
     expect(events[1]).toMatchObject({ type: "memory", records: [{ id: "sample-crm-shortlist", title: "CRM shortlist review" }] });
     expect(events[2]).toEqual({ type: "status", text: "Reading CRM shortlist review · Mon 9 Nov" });
+    expect(events[5]).toEqual({ type: "status", text: "Verifying figures" });
   });
 
   it("passes on the agent's search status, and lists the sources the answer links to", async () => {
@@ -119,12 +122,57 @@ describe("POST /api/chat", () => {
       type: "sources",
       sources: [{ title: "Example pricing", url: "https://example.com/pricing", site: "example.com", publishedDate: "2026-11-10", official: true }],
     });
-    expect(types(events).slice(-2)).toEqual(["sources", "done"]);
+    // FRONTEND.md: chips, answer text, sources, then the verification note.
+    expect(types(events).slice(-4)).toEqual(["sources", "status", "checks", "done"]);
   });
 
   it("sends no sources event for an answer that links to none", async () => {
     await start(fakeAgent(streams(["From the records."])).agent);
     expect(types(await ask({ message: "What did we decide?" }))).not.toContain("sources");
+  });
+
+  it("checks the answer against the loaded records and the pages the agent read", async () => {
+    const page: Evidence = {
+      title: "Example pricing",
+      url: "https://example.com/pricing",
+      site: "example.com",
+      publishedDate: "2026-11-10",
+      snippet: "Team plan: 15 USD per seat, billed monthly.",
+      official: true,
+    };
+    await start(
+      fakeAgent(async (request) => {
+        const text = "You shortlisted 5 tools on Mon 9 Nov. Example's Team plan is $15/user/mo, not $18.";
+        request.onText(text);
+        return { text, evidence: [page], searches: 1 };
+      }).agent,
+    );
+    await post("/import/sample", { timezone: KOLKATA });
+
+    const events = await ask({ message: "On Monday we shortlisted 5 CRM tools. Has Example's price changed?" });
+    const checks = events.find((event) => event.type === "checks");
+    expect(checks).toMatchObject({ status: "done" });
+    const marks = checks?.type === "checks" && checks.status === "done" ? checks.checks : [];
+    expect(marks.map((item) => [item.text, item.verified])).toEqual([
+      ["5", true],
+      ["Mon 9 Nov", true],
+      ["$15", true],
+      ["$18", false],
+    ]);
+  });
+
+  it("still gives and saves the answer when the check itself fails", async () => {
+    await start(fakeAgent(streams(["From the records."])).agent, () => {
+      throw new Error("check broke");
+    });
+    const events = await ask({ message: "What did we decide?" });
+    expect(events).toContainEqual({ type: "checks", status: "unavailable" });
+    expect(types(events).slice(-2)).toEqual(["checks", "done"]);
+    const done = events.at(-1);
+    expect(done).toMatchObject({ type: "done" });
+    const threadId = done?.type === "done" ? done.threadId : "";
+    const saved = (await (await fetch(`${base}/threads/${threadId}`)).json()) as ThreadMessage[];
+    expect(saved.map((message) => message.text)).toEqual(["What did we decide?", "From the records."]);
   });
 
   it("saves the question and the answer as a chat that can be reloaded and recalled", async () => {

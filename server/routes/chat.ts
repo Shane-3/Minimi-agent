@@ -1,10 +1,11 @@
 // The chat route: one question in, a stream of events out (ARCHITECTURE.md §4, §6).
 import { Router, type Response } from "express";
 import { z } from "zod";
-import type { ChatEvent, ThreadMessage } from "../../shared/types.ts";
+import type { ChatEvent, Check, ThreadMessage } from "../../shared/types.ts";
+import { checkAnswer, type GroundingInput } from "../agent/grounding.ts";
 import { AgentError, type Agent } from "../agent/loop.ts";
 import { buildPrompt } from "../agent/prompt.ts";
-import { chipsFor, FIRST_STATUS, sourcesFor, statusFor } from "../agent/status.ts";
+import { chipsFor, FIRST_STATUS, sourcesFor, statusFor, VERIFY_STATUS } from "../agent/status.ts";
 import { MESSAGE_MAX_CHARS } from "../config.ts";
 import { parseBody, sendError } from "../http.ts";
 import { isValidTimeZone } from "../memory/dates.ts";
@@ -20,6 +21,8 @@ export interface ChatRouteOptions {
   searchAvailable: boolean;
   /** Injected so tests can fix the time. */
   now?: () => Date;
+  /** The grounding check; injected so tests can make it fail. */
+  check?: (input: GroundingInput) => Check[];
 }
 
 const chatBody = z.object({
@@ -28,7 +31,13 @@ const chatBody = z.object({
   timezone: z.string().refine(isValidTimeZone, { error: "is not a timezone this server recognises" }),
 });
 
-export function chatRoutes({ store, agent, searchAvailable, now = () => new Date() }: ChatRouteOptions): Router {
+export function chatRoutes({
+  store,
+  agent,
+  searchAvailable,
+  now = () => new Date(),
+  check = checkAnswer,
+}: ChatRouteOptions): Router {
   const router = Router();
 
   router.post("/chat", async (req, res) => {
@@ -90,6 +99,21 @@ export function chatRoutes({ store, agent, searchAvailable, now = () => new Date
 
       const sources = sourcesFor(result.evidence, result.text);
       if (sources.length > 0) stream.send({ type: "sources", sources });
+
+      stream.send({ type: "status", text: VERIFY_STATUS });
+      stream.send(
+        verify(() =>
+          check({
+            answer: result.text,
+            question: body.message,
+            retrieval,
+            history,
+            evidence: result.evidence,
+            timezone: body.timezone,
+            now: askedAt,
+          }),
+        ),
+      );
 
       if (result.stopReason === "max_tokens") {
         // Cut off: kept on screen but not saved as a complete answer.
@@ -170,6 +194,19 @@ function openStream(res: Response): EventStream {
     },
     signal: controller.signal,
   };
+}
+
+/**
+ * The check is a safety net, not a gate: if it fails, the answer stands and is
+ * marked as unchecked (REQUIREMENTS.md §5).
+ */
+function verify(run: () => Check[]): ChatEvent {
+  try {
+    return { type: "checks", status: "done", checks: run() };
+  } catch (error) {
+    console.error("[chat] Grounding check failed:", error);
+    return { type: "checks", status: "unavailable" };
+  }
 }
 
 function errorEvent(code: string, message: string, retryable: boolean, threadId: string): ChatEvent {

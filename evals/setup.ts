@@ -2,6 +2,8 @@
 // history as loaded today, and asking one case through the real pipeline.
 import { readFileSync } from "node:fs";
 import dotenv from "dotenv";
+import type { Check } from "../shared/types.ts";
+import { checkAnswer } from "../server/agent/grounding.ts";
 import type { Agent } from "../server/agent/loop.ts";
 import { buildPrompt } from "../server/agent/prompt.ts";
 import { SAMPLE_PATH } from "../server/config.ts";
@@ -68,6 +70,11 @@ export interface CaseAnswer {
   misses: string[];
   /** How many web_search calls the agent made. */
   searches: number;
+  /**
+   * The grounding check's marks. Unverified ones are reported, not failed: each
+   * is either a model mistake or a check that is too strict, and a person decides which.
+   */
+  checks: Check[];
 }
 
 /** Asks one case through the same retrieval, prompt and loop the chat route uses. Throws what the agent throws. */
@@ -96,5 +103,14 @@ export async function askCase(agent: Agent, store: Store, evalCase: EvalCase, se
       ...(evalCase.needsSearch === true && result.searches === 0 ? ["searched the web"] : []),
     ],
     searches: result.searches,
+    checks: checkAnswer({
+      answer: result.text,
+      question: evalCase.question,
+      retrieval,
+      history: [],
+      evidence: result.evidence,
+      timezone: TIMEZONE,
+      now: asked,
+    }),
   };
 }

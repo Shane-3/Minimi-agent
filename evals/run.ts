@@ -62,17 +62,21 @@ async function main(): Promise<void> {
     // answered: a weaker model failing a case reads differently.
     const first = result.firstText === null ? "-" : `${result.firstText.toFixed(1)}s`;
     const searched = result.searches > 0 ? `, ${result.searches} search${result.searches === 1 ? "" : "es"}` : "";
-    const timing = `${result.model}, first text ${first}, done ${result.total.toFixed(1)}s${searched}`;
+    const unverified = result.checks.filter((check) => !check.verified);
+    const checked = `, ${result.checks.length} checked, ${unverified.length} unverified`;
+    const timing = `${result.model}, first text ${first}, done ${result.total.toFixed(1)}s${searched}${checked}`;
     if (result.misses.length === 0) {
       console.log(`PASS ${evalCase.id}. ${evalCase.name} (${timing})`);
-      if (show) console.log(`  answer:
-${result.answer.replace(/^/gm, "    ")}`);
+      if (show) console.log(`  answer:\n${result.answer.replace(/^/gm, "    ")}`);
     } else {
       failed += 1;
       console.log(`FAIL ${evalCase.id}. ${evalCase.name} (${timing})`);
       console.log(`  Q: ${evalCase.question}`);
       for (const miss of result.misses) console.log(`  missed: ${miss}`);
       console.log(`  answer:\n${result.answer.replace(/^/gm, "    ")}`);
+    }
+    for (const check of unverified) {
+      console.log(`  unverified ${check.kind}: ${JSON.stringify(check.text)} (${check.reason ?? "no reason given"})`);
     }
   }
 

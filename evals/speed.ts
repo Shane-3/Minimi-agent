@@ -1,6 +1,7 @@
-// npx tsx evals/speed.ts [model ...]
+// npx tsx evals/speed.ts [--levels LOW,MEDIUM] [model ...]
 // Compares free-tier models for speed and correctness on a few eval cases,
-// at thinking levels LOW and MEDIUM. Each model is asked on its own (a pool
+// at the given thinking levels (default LOW and MEDIUM; Gemma takes only
+// MINIMAL or HIGH). Each model is asked on its own (a pool
 // of one), so the timings are that model's, not the pool's.
 //
 // Calls go round the models in turn, so each model sees a call only every
@@ -12,7 +13,25 @@ import { askCase, evalEnv, sampleHistory } from "./setup.ts";
 
 /** Summary (the hardest), a decision with its quote, and a date with no record. */
 const CASES = [1, 2, 6];
-const LEVELS: ThinkingLevelName[] = ["LOW", "MEDIUM"];
+const LEVEL_NAMES: ThinkingLevelName[] = ["MINIMAL", "LOW", "MEDIUM", "HIGH"];
+
+function parseArgs(args: string[]): { levels: ThinkingLevelName[]; models: string[] } {
+  let levels: ThinkingLevelName[] = ["LOW", "MEDIUM"];
+  const models: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === "--levels") {
+      levels = (args[index + 1] ?? "").split(",").map((level) => {
+        const name = level.trim().toUpperCase() as ThinkingLevelName;
+        if (!LEVEL_NAMES.includes(name)) throw new Error(`Unknown thinking level "${level}"`);
+        return name;
+      });
+      index += 1;
+    } else {
+      models.push(args[index]!);
+    }
+  }
+  return { levels, models: models.length > 0 ? models : DEFAULT_MODELS };
+}
 
 interface Row {
   model: string;
@@ -25,7 +44,7 @@ interface Row {
 
 async function main(): Promise<void> {
   const env = evalEnv();
-  const models = process.argv.length > 2 ? process.argv.slice(2) : DEFAULT_MODELS;
+  const { levels: LEVELS, models } = parseArgs(process.argv.slice(2));
   const { store, context } = sampleHistory(new Date());
   const cases = evalCases(context).filter((evalCase) => CASES.includes(evalCase.id));
 

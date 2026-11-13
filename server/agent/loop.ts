@@ -95,7 +95,8 @@ export interface AgentOptions {
   client?: ModelClient;
 }
 
-export type ThinkingLevelName = "LOW" | "MEDIUM" | "HIGH";
+/** MINIMAL turns thinking off on models that allow it (Gemma); Gemini 4 models reject it. */
+export type ThinkingLevelName = "MINIMAL" | "LOW" | "MEDIUM" | "HIGH";
 
 export function createAgent(options: AgentOptions): Agent {
   const thinkingLevel = ThinkingLevel[options.thinkingLevel ?? MODEL_THINKING_LEVEL];

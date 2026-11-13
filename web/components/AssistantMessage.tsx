@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { Check, MemoryChip as Chip } from "../../shared/types.ts";
 import { MARK_PREFIX, markUnverified } from "../marks.ts";
 import type { AssistantMessage as Message } from "../state/chat.ts";
@@ -9,6 +10,9 @@ import { Quote } from "./Quote.tsx";
 import { Sources } from "./Sources.tsx";
 import { StatusLine } from "./StatusLine.tsx";
 import { VerificationNote } from "./VerificationNote.tsx";
+
+// GitHub-style Markdown: answers use tables for action items and prices.
+const REMARK_PLUGINS = [remarkGfm];
 
 interface AssistantMessageProps {
   message: Message;
@@ -35,7 +39,7 @@ export function AssistantMessage({ message, timezone, onOpenChip, onRetry }: Ass
 
       {message.text !== "" && (
         <div className={styles.body}>
-          <Markdown components={components(checks)}>{markUnverified(message.text, checks)}</Markdown>
+          <Markdown remarkPlugins={REMARK_PLUGINS} components={components(checks)}>{markUnverified(message.text, checks)}</Markdown>
         </div>
       )}
 

@@ -53,6 +53,14 @@ describe("AssistantMessage", () => {
     expect(html).toMatch(/<blockquote[^>]*>\s*<p><strong>Priya \(Acme\):<\/strong>/);
   });
 
+  it("renders a table, with marks inside its cells", () => {
+    const text = "| Plan | Price |\n|---|---|\n| Lite | $14 |\n| Pro | $18 |";
+    const html = render({ text, checks: [{ kind: "figure", text: "$18", start: text.indexOf("$18"), verified: false, reason: "Not found" }] });
+    expect(html).toContain("<table>");
+    expect(html).toMatch(/<td>Lite<\/td>\s*<td>\$14<\/td>/);
+    expect(html).toMatch(/<td><span[^>]*>\$18<span role="tooltip"/);
+  });
+
   it("does not render raw HTML from the answer", () => {
     const html = render({ text: 'Hi <img src="x" onerror="alert(1)"> there' });
     expect(html).not.toContain("<img");

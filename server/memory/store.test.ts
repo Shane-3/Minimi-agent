@@ -106,6 +106,23 @@ describe("Store", () => {
     expect(store.searchSegments("onboarding", 10)).toEqual([]);
   });
 
+  it("keeps what was shown with an answer, and removes it with the chat", () => {
+    const chat = { id: "chat-1", title: "Prices", startedAt: "2026-11-09T09:30:00.000Z", tz: "Asia/Kolkata" };
+    const meta = { chips: [], sources: [], checks: [{ kind: "figure" as const, text: "5", start: 0, verified: true }] };
+    store.ensureLiveChat(chat);
+    store.appendSegment("chat-1", { speaker: "user", text: "How many?", ts: null });
+    const answerId = store.appendSegment("chat-1", { speaker: "assistant", text: "5 tools.", ts: null }, meta);
+    expect(store.answerMeta("chat-1")).toEqual(new Map([[answerId, meta]]));
+
+    store.deleteRecord("chat-1");
+    expect(store.answerMeta("chat-1").size).toBe(0);
+
+    store.ensureLiveChat(chat);
+    store.appendSegment("chat-1", { speaker: "assistant", text: "5 tools.", ts: null }, meta);
+    store.clearAll();
+    expect(store.answerMeta("chat-1").size).toBe(0);
+  });
+
   it("saves nothing from a batch when one record fails", () => {
     // An invalid type passes TypeScript here only through the cast; SQLite's CHECK rejects it.
     const bad = record({ contentHash: "bad", type: "memo" as NewRecord["type"] });

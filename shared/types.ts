@@ -143,10 +143,24 @@ export type ChatEvent =
   /** messageId is null when the answer could not be saved. */
   | { type: "done"; messageId: number | null; threadId: string };
 
+/**
+ * What was shown with a saved answer, kept so a reloaded chat looks the same.
+ * All of it comes from code (retrieval, the pages read, the grounding check),
+ * none of it from the model.
+ */
+export interface AnswerMeta {
+  chips: MemoryChip[];
+  sources: Source[];
+  /** Null when the check itself failed ("Verification unavailable"). */
+  checks: Check[] | null;
+}
+
 /** One message of a live chat, as GET /api/threads/:id returns it. */
 export interface ThreadMessage {
   id: number;
   role: "user" | "assistant";
   text: string;
   ts: string | null;
+  /** On assistant messages saved with this app. */
+  meta?: AnswerMeta;
 }

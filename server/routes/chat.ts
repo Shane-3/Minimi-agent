@@ -60,18 +60,25 @@ export function chatRoutes({
         stream.send(errorEvent("bad_request", "That conversation can't be continued.", false, threadId));
         return;
       }
-      const history = (existing?.segments ?? []).flatMap(toThreadMessage);
+      const saved = (existing?.segments ?? []).flatMap(toThreadMessage);
+      // Retry sends the unanswered question again. It is already saved, and
+      // it is the question now, so it is not saved twice or sent as history.
+      const last = saved.at(-1);
+      const retrying = last?.role === "user" && last.text === body.message;
+      const history = retrying ? saved.slice(0, -1) : saved;
 
       // The question is saved before the model runs, so it survives a failed answer.
-      saveQuietly(() => {
-        store.ensureLiveChat({
-          id: threadId,
-          title: shortTitle(body.message),
-          startedAt: askedAt.toISOString(),
-          tz: body.timezone,
+      if (!retrying) {
+        saveQuietly(() => {
+          store.ensureLiveChat({
+            id: threadId,
+            title: shortTitle(body.message),
+            startedAt: askedAt.toISOString(),
+            tz: body.timezone,
+          });
+          store.appendSegment(threadId, { speaker: "user", text: body.message, ts: askedAt.toISOString() });
         });
-        store.appendSegment(threadId, { speaker: "user", text: body.message, ts: askedAt.toISOString() });
-      });
+      }
 
       const retrieval = retrieve(store, body.message, {
         timezone: body.timezone,
@@ -101,19 +108,18 @@ export function chatRoutes({
       if (sources.length > 0) stream.send({ type: "sources", sources });
 
       stream.send({ type: "status", text: VERIFY_STATUS });
-      stream.send(
-        verify(() =>
-          check({
-            answer: result.text,
-            question: body.message,
-            retrieval,
-            history,
-            evidence: result.evidence,
-            timezone: body.timezone,
-            now: askedAt,
-          }),
-        ),
+      const checks = verify(() =>
+        check({
+          answer: result.text,
+          question: body.message,
+          retrieval,
+          history,
+          evidence: result.evidence,
+          timezone: body.timezone,
+          now: askedAt,
+        }),
       );
+      stream.send(checks === null ? { type: "checks", status: "unavailable" } : { type: "checks", status: "done", checks });
 
       if (result.stopReason === "max_tokens") {
         // Cut off: kept on screen but not saved as a complete answer.
@@ -122,7 +128,11 @@ export function chatRoutes({
       }
 
       const messageId = saveQuietly(() =>
-        store.appendSegment(threadId, { speaker: "assistant", text: result.text, ts: now().toISOString() }),
+        store.appendSegment(
+          threadId,
+          { speaker: "assistant", text: result.text, ts: now().toISOString() },
+          { chips, sources, checks },
+        ),
       );
       stream.send({ type: "done", messageId, threadId });
     } catch (error) {
@@ -153,7 +163,11 @@ export function chatRoutes({
         sendError(res, 404, "not_found", "That conversation no longer exists.");
         return;
       }
-      const messages: ThreadMessage[] = record.segments.flatMap(toThreadMessage);
+      const meta = store.answerMeta(record.id);
+      const messages: ThreadMessage[] = record.segments.flatMap(toThreadMessage).map((message) => {
+        const shown = meta.get(message.id);
+        return shown === undefined ? message : { ...message, meta: shown };
+      });
       res.json(messages);
     } catch (error) {
       if (!(error instanceof StoreError)) throw error;
@@ -200,12 +214,12 @@ function openStream(res: Response): EventStream {
  * The check is a safety net, not a gate: if it fails, the answer stands and is
  * marked as unchecked (REQUIREMENTS.md §5).
  */
-function verify(run: () => Check[]): ChatEvent {
+function verify(run: () => Check[]): Check[] | null {
   try {
-    return { type: "checks", status: "done", checks: run() };
+    return run();
   } catch (error) {
     console.error("[chat] Grounding check failed:", error);
-    return { type: "checks", status: "unavailable" };
+    return null;
   }
 }
 

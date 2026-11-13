@@ -230,6 +230,70 @@ describe("POST /api/chat", () => {
     expect(store.getRecord(threadId)?.segments.map((segment) => segment.speaker)).toEqual(["user"]);
   });
 
+  it("on retry, answers the saved question without saving it twice or sending it as history", async () => {
+    let calls = 0;
+    const { agent, requests } = fakeAgent(async (request) => {
+      calls += 1;
+      if (calls === 1) throw new AgentError("unavailable", "The answer didn't come through. Your message is saved.", { retryable: true });
+      request.onText("Nothing was decided.");
+      return { text: "Nothing was decided." };
+    });
+    await start(agent);
+    const failed = await ask({ message: "What did we decide?" });
+    const threadId = failed.at(-1)?.type === "error" ? (failed.at(-1) as { threadId: string }).threadId : "";
+
+    const retried = await ask({ message: "What did we decide?", threadId });
+    expect(retried.at(-1)).toMatchObject({ type: "done", threadId });
+    expect(store.getRecord(threadId)?.segments.map((segment) => [segment.speaker, segment.text])).toEqual([
+      ["user", "What did we decide?"],
+      ["assistant", "Nothing was decided."],
+    ]);
+    const lastPrompt = requests.at(-1)!.messages;
+    expect(lastPrompt.filter((message) => message.role === "user")).toHaveLength(1);
+  });
+
+  it("reloads a saved answer with the chips, sources and checks shown with it", async () => {
+    const page: Evidence = {
+      title: "Example pricing",
+      url: "https://example.com/pricing",
+      site: "example.com",
+      publishedDate: "2026-11-10",
+      snippet: "Team plan: 15 USD per seat.",
+      official: true,
+    };
+    await start(
+      fakeAgent(async (request) => {
+        const text = "You shortlisted 5 tools. Team is $15 ([example.com](https://example.com/pricing)).";
+        request.onText(text);
+        return { text, evidence: [page], searches: 1 };
+      }).agent,
+    );
+    await post("/import/sample", { timezone: KOLKATA });
+    const events = await ask({ message: "On Monday we shortlisted 5 CRM tools. What does Example cost?" });
+    const threadId = events.at(-1)?.type === "done" ? (events.at(-1) as { threadId: string }).threadId : "";
+
+    const thread = (await (await fetch(`${base}/threads/${threadId}`)).json()) as ThreadMessage[];
+    expect(thread[0]!.meta).toBeUndefined();
+    expect(thread[1]!.meta).toMatchObject({
+      chips: [{ id: "sample-crm-shortlist" }],
+      sources: [{ url: "https://example.com/pricing" }],
+      checks: [
+        { text: "5", verified: true },
+        { text: "$15", verified: true },
+      ],
+    });
+  });
+
+  it("saves a failed check as unavailable, so a reload says so too", async () => {
+    await start(fakeAgent(streams(["From the records."])).agent, () => {
+      throw new Error("check broke");
+    });
+    const events = await ask({ message: "What did we decide?" });
+    const threadId = events.at(-1)?.type === "done" ? (events.at(-1) as { threadId: string }).threadId : "";
+    const thread = (await (await fetch(`${base}/threads/${threadId}`)).json()) as ThreadMessage[];
+    expect(thread[1]!.meta).toEqual({ chips: [], sources: [], checks: null });
+  });
+
   it("does not save an answer that was cut off", async () => {
     await start(fakeAgent(async (request) => {
       request.onText("Half");

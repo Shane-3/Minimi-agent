@@ -1,6 +1,6 @@
 // The only file that touches SQLite. Everything else goes through the Store.
 import Database from "better-sqlite3";
-import type { MemoryRecord, RecordSource, RecordSummary, RecordType, Segment } from "../../shared/types.ts";
+import type { AnswerMeta, MemoryRecord, RecordSource, RecordSummary, RecordType, Segment } from "../../shared/types.ts";
 
 /** A record ready to store: validated and normalised by the importer. */
 export interface NewRecord {
@@ -72,6 +72,13 @@ const SCHEMA = `
   );
 
   CREATE INDEX IF NOT EXISTS segments_record ON segments (record_id, seq);
+
+  -- What was shown with a saved answer (chips, sources, checks), as JSON, so
+  -- a reloaded chat looks the same. Made by code, never by the model.
+  CREATE TABLE IF NOT EXISTS answer_meta (
+    segment_id INTEGER PRIMARY KEY REFERENCES segments (id) ON DELETE CASCADE,
+    meta TEXT NOT NULL
+  );
 
   -- One row per segment, rowid = segments.id. The title is repeated on each
   -- row so a search for a meeting's name finds its segments. Porter stemming
@@ -201,8 +208,11 @@ export class Store {
     });
   }
 
-  /** Adds a message to the end of a record and to the search index. Returns the new segment's id. */
-  appendSegment(recordId: string, segment: NewSegment): number {
+  /**
+   * Adds a message to the end of a record and to the search index, with what
+   * was shown alongside it when given. Returns the new segment's id.
+   */
+  appendSegment(recordId: string, segment: NewSegment, meta?: AnswerMeta): number {
     return guard("save the message", () => {
       const run = this.db.transaction(() => {
         const record = this.db.prepare(`SELECT title FROM records WHERE id = ?`).get(recordId) as
@@ -218,6 +228,11 @@ export class Store {
         this.db
           .prepare(`INSERT INTO segments_fts (rowid, text, title, record_id) VALUES (?, ?, ?, ?)`)
           .run(result.lastInsertRowid, segment.text, record.title, recordId);
+        if (meta !== undefined) {
+          this.db
+            .prepare(`INSERT INTO answer_meta (segment_id, meta) VALUES (?, ?)`)
+            .run(result.lastInsertRowid, JSON.stringify(meta));
+        }
         return Number(result.lastInsertRowid);
       });
       return run();
@@ -247,6 +262,21 @@ export class Store {
     });
   }
 
+  /** What was shown with each saved answer in a record, by segment id. */
+  answerMeta(recordId: string): Map<number, AnswerMeta> {
+    return guard("read a chat", () => {
+      const rows = this.db
+        .prepare(`
+          SELECT answer_meta.segment_id AS id, answer_meta.meta AS meta
+          FROM answer_meta JOIN segments ON segments.id = answer_meta.segment_id
+          WHERE segments.record_id = ?
+        `)
+        .all(recordId) as { id: number; meta: string }[];
+      // Written only by appendSegment from typed values, so the shape is known.
+      return new Map(rows.map((row) => [row.id, JSON.parse(row.meta) as AnswerMeta]));
+    });
+  }
+
   /** Returns false when no record had that id. */
   deleteRecord(id: string): boolean {
     return guard("remove a record", () => {
@@ -263,7 +293,7 @@ export class Store {
   clearAll(): void {
     guard("clear memory", () => {
       this.db.transaction(() => {
-        this.db.exec(`DELETE FROM segments_fts; DELETE FROM segments; DELETE FROM records;`);
+        this.db.exec(`DELETE FROM segments_fts; DELETE FROM answer_meta; DELETE FROM segments; DELETE FROM records;`);
       })();
     });
   }

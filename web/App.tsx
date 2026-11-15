@@ -284,6 +284,7 @@ export function App() {
             messages={chat.messages}
             timezone={timezone}
             onOpenChip={openChip}
+            onAsk={streaming ? null : (question) => void ask(question)}
             onRetry={streaming ? null : (key) => {
               const message = chat.messages.find((item) => item.key === key);
               if (message?.kind === "assistant") void ask(message.question, key);

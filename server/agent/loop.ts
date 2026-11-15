@@ -24,7 +24,15 @@ import {
 } from "../config.ts";
 import { ModelPool, type Rest } from "./pool.ts";
 import type { Prompt } from "./prompt.ts";
-import { WEB_SEARCH_TOOL, webSearchInput, type WebSearch, type WebSearchInput, type WebSearchResult } from "./search.ts";
+import {
+  WEB_SEARCH_TOOL,
+  webSearchInput,
+  type EntityResult,
+  type SearchFailure,
+  type WebSearch,
+  type WebSearchInput,
+  type WebSearchResult,
+} from "./search.ts";
 
 export type AgentErrorCode =
   /** Overloaded, server error or network failure, after the retry. */
@@ -84,6 +92,8 @@ export interface AnswerResult {
   evidence: Evidence[];
   /** How many web_search calls ran. */
   searches: number;
+  /** Entities whose last search failed; empty when every search worked or none ran. */
+  failedSearches: { entity: string; failure: SearchFailure }[];
 }
 
 export interface Agent {
@@ -341,6 +351,9 @@ export function createAgent(options: AgentOptions): Agent {
     async answer(request) {
       const messages: ChatMessage[] = [{ role: "system", content: request.system }, ...request.messages];
       const evidence = new Map<string, Evidence>();
+      // The latest result for each entity: a search that failed and then
+      // worked when the model tried again counts as worked.
+      const latest = new Map<string, EntityResult>();
       let text = "";
       let searches = 0;
       // Text from different calls is kept apart by a blank line, both on
@@ -389,6 +402,9 @@ export function createAgent(options: AgentOptions): Agent {
             model: call.model,
             evidence: [...evidence.values()],
             searches,
+            failedSearches: [...latest.values()]
+              .filter((entity) => entity.status === "failed")
+              .map((entity) => ({ entity: entity.entity, failure: entity.failure ?? "failed" })),
           };
         }
 
@@ -407,6 +423,7 @@ export function createAgent(options: AgentOptions): Agent {
           if (ran) searches += 1;
           if ("entities" in result) {
             for (const entity of result.entities) {
+              latest.set(entity.entity, entity);
               for (const page of entity.evidence) if (!evidence.has(page.url)) evidence.set(page.url, page);
             }
           }

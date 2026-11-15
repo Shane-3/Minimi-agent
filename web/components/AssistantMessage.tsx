@@ -20,10 +20,12 @@ interface AssistantMessageProps {
   onOpenChip: (chip: Chip, quotes: string[]) => void;
   /** Null except on the last answer: only the newest question can be asked again. */
   onRetry: (() => void) | null;
+  /** Asks the question again as a new message, after some searches failed. Null while an answer streams. */
+  onCheckAgain: (() => void) | null;
 }
 
 /** An answer as plain text in the column: chips, text, sources, then the verification note. */
-export function AssistantMessage({ message, timezone, onOpenChip, onRetry }: AssistantMessageProps) {
+export function AssistantMessage({ message, timezone, onOpenChip, onRetry, onCheckAgain }: AssistantMessageProps) {
   const checks = message.checks ?? [];
   const quotes = checks.filter((check) => check.kind === "quote").map((check) => check.text);
 
@@ -46,11 +48,26 @@ export function AssistantMessage({ message, timezone, onOpenChip, onRetry }: Ass
       {message.status !== null && <StatusLine text={message.status} />}
 
       {message.sources.length > 0 && <Sources sources={message.sources} />}
+      {message.searchFailed !== null && (
+        <p className={styles.searchFailed}>
+          Couldn't check {listOf(message.searchFailed.entities)}.{" "}
+          {message.searchFailed.retryable && onCheckAgain !== null && (
+            <button type="button" className="link-button" onClick={onCheckAgain}>
+              Check again
+            </button>
+          )}
+        </p>
+      )}
       {message.checks !== undefined && <VerificationNote checks={message.checks} />}
 
       <Ending message={message} onRetry={onRetry} />
     </article>
   );
+}
+
+/** "A", "A and B", "A, B and C". */
+function listOf(names: string[]): string {
+  return names.length < 2 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)!}`;
 }
 
 /** What is said under an answer that did not finish normally. */

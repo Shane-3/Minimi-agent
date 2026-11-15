@@ -5,7 +5,7 @@ import express from "express";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ApiError, ChatEvent, Check, Evidence, ThreadMessage } from "../../shared/types.ts";
 import type { GroundingInput } from "../agent/grounding.ts";
-import { AgentError, type Agent, type AnswerRequest } from "../agent/loop.ts";
+import { AgentError, type Agent, type AnswerRequest, type AnswerResult } from "../agent/loop.ts";
 import { createApi } from "../api.ts";
 import { Store } from "../memory/store.ts";
 
@@ -17,14 +17,20 @@ const NOW = new Date("2026-11-11T06:00:00Z");
 function fakeAgent(
   reply: (
     request: AnswerRequest,
-  ) => Promise<{ text: string; stopReason?: "end_turn" | "max_tokens"; evidence?: Evidence[]; searches?: number }>,
+  ) => Promise<{
+    text: string;
+    stopReason?: "end_turn" | "max_tokens";
+    evidence?: Evidence[];
+    searches?: number;
+    failedSearches?: AnswerResult["failedSearches"];
+  }>,
 ) {
   const requests: AnswerRequest[] = [];
   const agent: Agent = {
     async answer(request) {
       requests.push(request);
-      const { text, stopReason = "end_turn", evidence = [], searches = 0 } = await reply(request);
-      return { text, stopReason, model: "test-model", evidence, searches };
+      const { text, stopReason = "end_turn", evidence = [], searches = 0, failedSearches = [] } = await reply(request);
+      return { text, stopReason, model: "test-model", evidence, searches, failedSearches };
     },
   };
   return { agent, requests };
@@ -124,6 +130,32 @@ describe("POST /api/chat", () => {
     });
     // FRONTEND.md: chips, answer text, sources, then the verification note.
     expect(types(events).slice(-4)).toEqual(["sources", "status", "checks", "done"]);
+  });
+
+  it("says which searches failed, saves it, and offers no retry when the key was rejected", async () => {
+    await start(
+      fakeAgent(async (request) => {
+        request.onText("HubSpot: couldn't verify.");
+        return {
+          text: "HubSpot: couldn't verify.",
+          searches: 1,
+          failedSearches: [
+            { entity: "HubSpot", failure: "timeout" },
+            { entity: "Pipedrive", failure: "auth" },
+          ],
+        };
+      }).agent,
+    );
+    const events = await ask({ message: "Has pricing changed?" });
+    expect(events).toContainEqual({ type: "search_failed", entities: ["HubSpot", "Pipedrive"], retryable: true });
+    const threadId = events.at(-1)?.type === "done" ? (events.at(-1) as { threadId: string }).threadId : "";
+    const thread = (await (await fetch(`${base}/threads/${threadId}`)).json()) as ThreadMessage[];
+    expect(thread[1]!.meta?.searchFailed).toEqual({ entities: ["HubSpot", "Pipedrive"], retryable: true });
+  });
+
+  it("marks failed searches as not worth retrying when every failure was the key", async () => {
+    await start(fakeAgent(async () => ({ text: "x", failedSearches: [{ entity: "HubSpot", failure: "auth" }] })).agent);
+    expect(await ask({ message: "Has pricing changed?" })).toContainEqual({ type: "search_failed", entities: ["HubSpot"], retryable: false });
   });
 
   it("sends no sources event for an answer that links to none", async () => {

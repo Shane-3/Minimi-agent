@@ -120,6 +120,16 @@ export interface Check {
   reason?: string;
 }
 
+/**
+ * Entities whose web search failed, so the answer says "couldn't verify" for
+ * them and the UI offers to check again. Not retryable when the search key
+ * itself was rejected: asking again would fail the same way.
+ */
+export interface SearchFailures {
+  entities: string[];
+  retryable: boolean;
+}
+
 /** A web page an answer links to, listed under it: site, title and date. */
 export type Source = Pick<Evidence, "title" | "url" | "site" | "publishedDate" | "official">;
 
@@ -133,6 +143,8 @@ export type ChatEvent =
   | { type: "delta"; text: string }
   /** The web pages the answer links to, sent once the answer is complete. */
   | { type: "sources"; sources: Source[] }
+  /** Sent after sources when the search for some entities failed. */
+  | ({ type: "search_failed" } & SearchFailures)
   /**
    * The grounding check of the finished answer. "unavailable" when the check
    * itself failed: the answer stands, marked as unchecked.
@@ -153,6 +165,8 @@ export interface AnswerMeta {
   sources: Source[];
   /** Null when the check itself failed ("Verification unavailable"). */
   checks: Check[] | null;
+  /** Absent when every search worked, or none ran. */
+  searchFailed?: SearchFailures;
 }
 
 /** One message of a live chat, as GET /api/threads/:id returns it. */

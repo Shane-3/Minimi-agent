@@ -10,9 +10,11 @@ interface MessageListProps {
   onOpenChip: (chip: MemoryChip, quotes: string[]) => void;
   /** Null while an answer streams. */
   onRetry: ((answerKey: string) => void) | null;
+  /** Asks a question again as a new message. Null while an answer streams. */
+  onAsk: ((question: string) => void) | null;
 }
 
-export function MessageList({ messages, timezone, onOpenChip, onRetry }: MessageListProps) {
+export function MessageList({ messages, timezone, onOpenChip, onRetry, onAsk }: MessageListProps) {
   return (
     <div className={styles.list}>
       {messages.map((message, index) =>
@@ -25,6 +27,7 @@ export function MessageList({ messages, timezone, onOpenChip, onRetry }: Message
             timezone={timezone}
             onOpenChip={onOpenChip}
             onRetry={onRetry !== null && index === messages.length - 1 ? () => onRetry(message.key) : null}
+            onCheckAgain={onAsk === null ? null : () => onAsk(message.question)}
           />
         ),
       )}

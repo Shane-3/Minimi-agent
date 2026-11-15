@@ -39,6 +39,27 @@ describe("chatReducer", () => {
     expect(isStreaming(state)).toBe(false);
   });
 
+  it("keeps which searches failed, live and after a reload", () => {
+    const live = play(asked(), { type: "search_failed", entities: ["HubSpot"], retryable: true });
+    expect(lastAnswer(live).searchFailed).toEqual({ entities: ["HubSpot"], retryable: true });
+
+    const restored = chatReducer(initialChat("other"), {
+      type: "restored",
+      threadId: THREAD,
+      messages: [
+        { id: 1, role: "user", text: "Changed?", ts: null },
+        {
+          id: 2,
+          role: "assistant",
+          text: "HubSpot: couldn't verify.",
+          ts: null,
+          meta: { chips: [], sources: [], checks: [], searchFailed: { entities: ["HubSpot"], retryable: true } },
+        },
+      ],
+    });
+    expect(lastAnswer(restored).searchFailed).toEqual({ entities: ["HubSpot"], retryable: true });
+  });
+
   it("records a failed check as null and an unsaved answer", () => {
     const state = play(asked(), { type: "checks", status: "unavailable" }, { type: "done", messageId: null, threadId: THREAD });
     expect(lastAnswer(state)).toMatchObject({ checks: null, saved: false });

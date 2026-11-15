@@ -15,6 +15,7 @@ function message(overrides: Partial<Message>): Message {
     status: null,
     chips: [],
     sources: [],
+    searchFailed: null,
     checks: [],
     error: null,
     saved: true,
@@ -22,8 +23,10 @@ function message(overrides: Partial<Message>): Message {
   };
 }
 
-const render = (props: Partial<Message>, onRetry: (() => void) | null = () => {}) =>
-  renderToStaticMarkup(<AssistantMessage message={message(props)} timezone={KOLKATA} onOpenChip={() => {}} onRetry={onRetry} />);
+const render = (props: Partial<Message>, onRetry: (() => void) | null = () => {}, onCheckAgain: (() => void) | null = () => {}) =>
+  renderToStaticMarkup(
+    <AssistantMessage message={message(props)} timezone={KOLKATA} onOpenChip={() => {}} onRetry={onRetry} onCheckAgain={onCheckAgain} />,
+  );
 
 describe("AssistantMessage", () => {
   it("shows chips, the answer, sources and the note, in that order", () => {
@@ -83,6 +86,13 @@ describe("AssistantMessage", () => {
       /The answer didn(&#x27;|')t come through\. Your message is saved\..*Retry/,
     );
     expect(render({ phase: "error", error: { message: "Not allowed.", retryable: false } })).not.toContain("Retry");
+  });
+
+  it("names the entities a search could not check, with Check again when asking again can help", () => {
+    const html = render({ text: "Done.", searchFailed: { entities: ["HubSpot", "Pipedrive"], retryable: true } });
+    expect(html).toMatch(/Couldn(&#x27;|')t check HubSpot and Pipedrive\..*Check again/);
+    expect(render({ text: "Done.", searchFailed: { entities: ["HubSpot"], retryable: false } })).not.toContain("Check again");
+    expect(render({ text: "Done.", searchFailed: { entities: ["HubSpot"], retryable: true } }, null, null)).not.toContain("Check again");
   });
 
   it("offers no Retry on an answer that is not the last", () => {

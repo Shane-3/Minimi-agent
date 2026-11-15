@@ -1,5 +1,5 @@
 // The chat screen's state: the thread's messages and the answer being streamed.
-import type { ChatEvent, Check, MemoryChip, Source, ThreadMessage } from "../../shared/types.ts";
+import type { ChatEvent, Check, MemoryChip, SearchFailures, Source, ThreadMessage } from "../../shared/types.ts";
 
 export interface UserMessage {
   kind: "user";
@@ -28,6 +28,8 @@ export interface AssistantMessage {
   status: string | null;
   chips: MemoryChip[];
   sources: Source[];
+  /** Entities the web search could not check, or null. */
+  searchFailed: SearchFailures | null;
   /** Undefined until the check reports; null when it could not run. */
   checks: Check[] | null | undefined;
   error: { message: string; retryable: boolean } | null;
@@ -68,6 +70,7 @@ function answer(key: string, question: string): AssistantMessage {
     status: null,
     chips: [],
     sources: [],
+    searchFailed: null,
     checks: undefined,
     error: null,
     saved: true,
@@ -101,6 +104,8 @@ function applyEvent(message: AssistantMessage, event: ChatEvent): AssistantMessa
       return { ...message, text: message.text + event.text, phase: "streaming", status: null };
     case "sources":
       return { ...message, sources: event.sources };
+    case "search_failed":
+      return { ...message, searchFailed: { entities: event.entities, retryable: event.retryable } };
     case "checks":
       return { ...message, checks: event.status === "done" ? event.checks : null };
     case "error":
@@ -128,6 +133,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
             phase: "complete",
             chips: saved.meta?.chips ?? [],
             sources: saved.meta?.sources ?? [],
+            searchFailed: saved.meta?.searchFailed ?? null,
             checks: saved.meta === undefined ? undefined : saved.meta.checks,
           });
         }

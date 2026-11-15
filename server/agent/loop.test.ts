@@ -121,6 +121,7 @@ describe("createAgent", () => {
       model: "test-model-served",
       evidence: [],
       searches: 0,
+      failedSearches: [],
     });
   });
 
@@ -458,6 +459,33 @@ describe("createAgent with web_search", () => {
     });
     expect(second.at(-1)).toMatchObject({ role: "tool", tool_call_id: "call_0" });
     expect(JSON.parse(second.at(-1)!.content!)).toMatchObject({ entities: [{ entity: "HubSpot", status: "found" }] });
+  });
+
+  it("reports the entities whose last search failed, and not one that worked when tried again", async () => {
+    let attempt = 0;
+    const webSearch: WebSearch = {
+      async search(input) {
+        attempt += 1;
+        return {
+          searchedAt: "2026-11-13T06:00:00.000Z",
+          entities: input.entities.map((entity) =>
+            // Pipedrive fails every time; HubSpot fails once, then works.
+            entity.name === "Pipedrive" || attempt === 1
+              ? { entity: entity.name, status: "failed" as const, failure: "timeout" as const, evidence: [] }
+              : { entity: entity.name, status: "found" as const, evidence: [] },
+          ),
+        };
+      },
+    };
+    const both = { name: "web_search", arguments: JSON.stringify({ entities: [{ name: "HubSpot", queries: ["HubSpot pricing"] }, { name: "Pipedrive", queries: ["Pipedrive pricing"] }] }) };
+    const { agent } = searchAgent([{ toolCalls: [both] }, { toolCalls: [both] }, { text: ["ok"] }], { webSearch, inputs: [], maxInFlight: () => 0 });
+    const result = await agent.answer({ ...prompt, onText: () => {} });
+    expect(result.failedSearches).toEqual([{ entity: "Pipedrive", failure: "timeout" }]);
+  });
+
+  it("reports no failed searches when none ran", async () => {
+    const { agent } = searchAgent([{ text: ["From the records."] }]);
+    expect((await agent.answer({ ...prompt, onText: () => {} })).failedSearches).toEqual([]);
   });
 
   it("decides with recall reasoning, then weighs the results with more", async () => {

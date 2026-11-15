@@ -1,9 +1,9 @@
 // The chat route: one question in, a stream of events out (ARCHITECTURE.md §4, §6).
 import { Router, type Response } from "express";
 import { z } from "zod";
-import type { ChatEvent, Check, ThreadMessage } from "../../shared/types.ts";
+import type { ChatEvent, Check, SearchFailures, ThreadMessage } from "../../shared/types.ts";
 import { checkAnswer, type GroundingInput } from "../agent/grounding.ts";
-import { AgentError, type Agent } from "../agent/loop.ts";
+import { AgentError, type Agent, type AnswerResult } from "../agent/loop.ts";
 import { buildPrompt } from "../agent/prompt.ts";
 import { chipsFor, FIRST_STATUS, sourcesFor, statusFor, VERIFY_STATUS } from "../agent/status.ts";
 import { MESSAGE_MAX_CHARS } from "../config.ts";
@@ -106,6 +106,8 @@ export function chatRoutes({
 
       const sources = sourcesFor(result.evidence, result.text);
       if (sources.length > 0) stream.send({ type: "sources", sources });
+      const searchFailed = failuresOf(result.failedSearches);
+      if (searchFailed !== undefined) stream.send({ type: "search_failed", ...searchFailed });
 
       stream.send({ type: "status", text: VERIFY_STATUS });
       const checks = verify(() =>
@@ -131,7 +133,7 @@ export function chatRoutes({
         store.appendSegment(
           threadId,
           { speaker: "assistant", text: result.text, ts: now().toISOString() },
-          { chips, sources, checks },
+          { chips, sources, checks, ...(searchFailed === undefined ? {} : { searchFailed }) },
         ),
       );
       stream.send({ type: "done", messageId, threadId });
@@ -208,6 +210,15 @@ function openStream(res: Response): EventStream {
     },
     signal: controller.signal,
   };
+}
+
+/**
+ * What the UI says about failed searches. Asking again cannot help when the
+ * search key itself was rejected, so then there is no "Check again".
+ */
+function failuresOf(failed: AnswerResult["failedSearches"]): SearchFailures | undefined {
+  if (failed.length === 0) return undefined;
+  return { entities: failed.map((item) => item.entity), retryable: failed.some((item) => item.failure !== "auth") };
 }
 
 /**

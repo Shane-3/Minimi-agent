@@ -62,6 +62,29 @@ export interface RetrieveOptions {
   budgetTokens?: number;
   /** The live chat this question belongs to: already in the conversation, so not loaded again as memory. */
   excludeRecordId?: string;
+  /**
+   * Earlier turns of the same chat, so a follow-up ("why?", "anyone else?")
+   * still finds what the conversation is about: the last few questions, and
+   * the records the last few answers drew on.
+   */
+  followUp?: FollowUp;
+}
+
+export interface FollowUp {
+  questions: string[];
+  /** The chat's last answers: the people they name are searched for too ("anyone else?"). */
+  answers: string[];
+  recordIds: string[];
+}
+
+/**
+ * Names of people in the records ("Priya (Acme)" is "priya") that the texts
+ * mention, so a follow-up about someone finds what else they said.
+ */
+function peopleNamed(texts: string[], index: RecordSummary[]): string[] {
+  const people = new Set(index.flatMap((record) => record.participants.map((name) => name.split(/[\s(]/)[0]!.toLowerCase())));
+  const words = new Set(texts.join(" ").toLowerCase().match(/[\p{L}]+/gu) ?? []);
+  return [...people].filter((name) => name.length > 1 && words.has(name));
 }
 
 export function retrieve(store: Store, message: string, options: RetrieveOptions): Retrieval {
@@ -76,7 +99,20 @@ export function retrieve(store: Store, message: string, options: RetrieveOptions
   const query = ftsQuery(keywords(message, resolved));
   const topic = query === null ? new Map<string, TopicMatch>() : topicMatches(store, query, byId);
   const dates = resolved.map((date) => findDate(date, index, topic));
-  const focus = chooseFocus(dates, topic, byId);
+
+  // What the chat was about before this question.
+  const carriedIds = (options.followUp?.recordIds ?? []).filter((id) => byId.has(id));
+  const carriedWords = [
+    ...(options.followUp?.questions ?? []).flatMap((question) => keywords(question, [])),
+    ...peopleNamed(options.followUp?.answers ?? [], index),
+  ];
+  const carriedQuery = ftsQuery([...new Set(carriedWords)]);
+  const carriedTopic = carriedQuery === null ? new Map<string, TopicMatch>() : topicMatches(store, carriedQuery, byId);
+
+  // A follow-up with nothing of its own to go on ("why?") is about what the
+  // last answers were about.
+  const ownFocus = chooseFocus(dates, topic, byId);
+  const focus = ownFocus.length === 0 && dates.length === 0 ? carriedIds.flatMap((id) => byId.get(id) ?? []) : ownFocus;
 
   const sizes = store.recordSizes();
   const tokensOf = (id: string) => estimateTokens(sizes.get(id));
@@ -97,7 +133,7 @@ export function retrieve(store: Store, message: string, options: RetrieveOptions
 
   const loaded: LoadedRecord[] = [];
   let remaining = budget;
-  for (const id of rankCandidates(dates, topic, focus, index)) {
+  for (const id of rankCandidates(dates, topic, focus, index, carriedIds, carriedTopic)) {
     if (remaining <= 0) break;
     const size = tokensOf(id);
     const record = store.getRecord(id);
@@ -107,7 +143,7 @@ export function retrieve(store: Store, message: string, options: RetrieveOptions
       remaining -= size;
     } else if (size > budget) {
       // Too long to ever load whole: take the parts that match the question.
-      const partial = partialRecord(store, record, query, remaining);
+      const partial = partialRecord(store, record, query ?? carriedQuery, remaining);
       if (partial !== null) {
         loaded.push(partial);
         remaining -= partial.record.segments.reduce((sum, segment) => sum + segmentTokens(segment), 0);
@@ -258,17 +294,26 @@ function chooseFocus(
   return [...new Set(ids)].flatMap((id) => byId.get(id) ?? []);
 }
 
-/** Load order when not everything fits: the focus, then the week-earlier alternatives, then other keyword matches. */
+/**
+ * Load order when not everything fits: the focus; the records the chat's
+ * last answers drew on; the week-earlier alternatives; other keyword matches
+ * for this question; then matches for the chat's earlier questions.
+ */
 function rankCandidates(
   dates: DateFinding[],
   topic: Map<string, TopicMatch>,
   focus: RecordSummary[],
   index: RecordSummary[],
+  carriedIds: string[],
+  carriedTopic: Map<string, TopicMatch>,
 ): string[] {
+  const byScore = (matches: Map<string, TopicMatch>) => [...matches.entries()].sort((a, b) => a[1].score - b[1].score).map(([id]) => id);
   const ids = [
     ...focus.map((record) => record.id),
+    ...carriedIds,
     ...dates.flatMap((date) => date.earlier?.recordIds ?? []),
-    ...[...topic.entries()].sort((a, b) => a[1].score - b[1].score).map(([id]) => id),
+    ...byScore(topic),
+    ...byScore(carriedTopic),
   ];
   // Nothing matched at all ("summarise everything"): the most recent records.
   if (ids.length === 0) ids.push(...index.map((record) => record.id));

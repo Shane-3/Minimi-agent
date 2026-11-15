@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { importInto, loadSampleInto, prepareImport, prepareSample } from "../memory/importer.ts";
 import { retrieve } from "../memory/retrieve.ts";
 import { Store } from "../memory/store.ts";
-import { buildPrompt, rulesFor } from "./prompt.ts";
+import { buildPrompt, fitHistory, rulesFor } from "./prompt.ts";
 
 const RULES = rulesFor(true);
 
@@ -185,4 +185,22 @@ describe("buildPrompt: conversation history", () => {
     expect(prompt.messages.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
     expect(prompt.messages[1]?.content).toBe("The shortlist is five tools.");
   });
+  it("keeps only the most recent turns that fit, starting with a question", () => {
+    const turn = (id: number, role: "user" | "assistant", chars: number) => ({ id, role, text: "x".repeat(chars), ts: null });
+    const history = [turn(1, "user", 400), turn(2, "assistant", 400), turn(3, "user", 40), turn(4, "assistant", 400)];
+    // 4 characters a token: 150 tokens hold the last answer (100) and the question before it (10), not more.
+    expect(fitHistory(history, 150)).toEqual({ kept: [history[2], history[3]], trimmed: true });
+    // An answer whose question did not fit is dropped too.
+    expect(fitHistory(history, 105).kept).toEqual([]);
+    expect(fitHistory(history, 10_000)).toEqual({ kept: history, trimmed: false });
+  });
+
+  it("tells the model when older turns were left out", () => {
+    const retrieval = retrieve(store, "And after that?", { timezone: KOLKATA, now: NOW });
+    const input = { searchAvailable: true, retrieval, question: "And after that?", history: [], timezone: KOLKATA, now: NOW };
+    expect(turnOfPrompt(buildPrompt({ ...input, historyTrimmed: true }))).toContain("Earlier turns of this chat are not shown above.");
+    expect(turnOfPrompt(buildPrompt(input))).not.toContain("Earlier turns");
+  });
 });
+
+const turnOfPrompt = (prompt: ReturnType<typeof buildPrompt>) => prompt.messages.at(-1)?.content ?? "";

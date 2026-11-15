@@ -236,6 +236,15 @@ describe("POST /api/chat", () => {
     expect(second.system).not.toContain("What did we decide about Acme?");
   });
 
+  it("keeps a follow-up on the records the chat's last answer drew on", async () => {
+    await start(fakeAgent(streams(["ok"])).agent);
+    await post("/import/sample", { timezone: KOLKATA });
+    const first = await ask({ message: "On Monday we shortlisted 5 CRM tools. What were they?" });
+    const threadId = first.at(-1)?.type === "done" ? (first.at(-1) as { threadId: string }).threadId : "";
+    const followUp = await ask({ message: "Why?", threadId });
+    expect(followUp.find((event) => event.type === "memory")).toMatchObject({ records: [{ id: "sample-crm-shortlist" }] });
+  });
+
   it("recalls a different, earlier conversation as a record", async () => {
     const { agent, requests } = fakeAgent(streams(["ok"]));
     await start(agent);

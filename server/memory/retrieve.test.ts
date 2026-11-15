@@ -175,6 +175,27 @@ describe("retrieve: over the budget", () => {
     expect(result.index).toHaveLength(6);
   });
 
+  it("keeps a follow-up on the records the chat was about", () => {
+    loadSample();
+    const followUp = { questions: ["What did Priya say about the discount?"], answers: [], recordIds: ["sample-acme-renewal"] };
+    // "Why?" has nothing of its own to search for: the last answer's record is its focus, and is loaded.
+    const why = retrieve(store, "Why?", { timezone: KOLKATA, now: NOW, budgetTokens: 400, followUp });
+    expect(focusIds(why)).toEqual(["sample-acme-renewal"]);
+    expect(loadedIds(why)).toContain("sample-acme-renewal");
+    // A follow-up with its own topic keeps that focus, and still loads the chat's records after it.
+    const crm = retrieve(store, "And the CRM shortlist?", { timezone: KOLKATA, now: NOW, budgetTokens: 800, followUp });
+    expect(focusIds(crm)).toEqual(["sample-crm-shortlist"]);
+    expect(loadedIds(crm)).toEqual(expect.arrayContaining(["sample-crm-shortlist", "sample-acme-renewal"]));
+  });
+
+  it("searches for the people the chat's last answers named", () => {
+    loadSample();
+    // Meera speaks only in the CRM review; the follow-up names nobody, the last answer did.
+    const followUp = { questions: [], answers: ["Meera leaned towards HubSpot."], recordIds: [] };
+    const result = retrieve(store, "Anyone else?", { timezone: KOLKATA, now: NOW, budgetTokens: 400, followUp });
+    expect(loadedIds(result)).toContain("sample-crm-shortlist");
+  });
+
   it("loads the most recent records when nothing matches", () => {
     loadSample();
     const result = ask("Give me an overview", 400);

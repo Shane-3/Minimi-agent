@@ -1,16 +1,16 @@
 // The chat route: one question in, a stream of events out (ARCHITECTURE.md §4, §6).
 import { Router, type Response } from "express";
 import { z } from "zod";
-import type { ChatEvent, Check, SearchFailures, ThreadMessage } from "../../shared/types.ts";
+import type { AnswerMeta, ChatEvent, Check, SearchFailures, ThreadMessage } from "../../shared/types.ts";
 import { checkAnswer, type GroundingInput } from "../agent/grounding.ts";
 import { AgentError, type Agent, type AnswerResult } from "../agent/loop.ts";
-import { buildPrompt } from "../agent/prompt.ts";
+import { buildPrompt, fitHistory } from "../agent/prompt.ts";
 import { chipsFor, FIRST_STATUS, sourcesFor, statusFor, VERIFY_STATUS } from "../agent/status.ts";
-import { MESSAGE_MAX_CHARS } from "../config.ts";
+import { FOLLOW_UP_TURNS, MESSAGE_MAX_CHARS } from "../config.ts";
 import { parseBody, sendError } from "../http.ts";
 import { isValidTimeZone } from "../memory/dates.ts";
 import { shortTitle } from "../memory/importer.ts";
-import { retrieve } from "../memory/retrieve.ts";
+import { retrieve, type FollowUp } from "../memory/retrieve.ts";
 import { StoreError, type Store } from "../memory/store.ts";
 
 export interface ChatRouteOptions {
@@ -80,10 +80,14 @@ export function chatRoutes({
         });
       }
 
+      // A long chat sends only its recent turns. Its older turns are then found
+      // like any other record, so the chat is not left out of the search.
+      const recent = fitHistory(history);
       const retrieval = retrieve(store, body.message, {
         timezone: body.timezone,
         now: askedAt,
-        excludeRecordId: threadId,
+        ...(recent.trimmed ? {} : { excludeRecordId: threadId }),
+        followUp: followUpOf(history, store.answerMeta(threadId)),
       });
       const chips = chipsFor(retrieval);
       if (chips.length > 0) stream.send({ type: "memory", records: chips });
@@ -92,7 +96,8 @@ export function chatRoutes({
       const prompt = buildPrompt({
         retrieval,
         question: body.message,
-        history,
+        history: recent.kept,
+        historyTrimmed: recent.trimmed,
         timezone: body.timezone,
         now: askedAt,
         searchAvailable,
@@ -209,6 +214,19 @@ function openStream(res: Response): EventStream {
       if (!res.writableEnded) res.end();
     },
     signal: controller.signal,
+  };
+}
+
+/** The chat's last few questions, and the records its last few answers drew on (their chips). */
+function followUpOf(history: ThreadMessage[], meta: Map<number, AnswerMeta>): FollowUp {
+  const questions = history.filter((message) => message.role === "user").slice(-FOLLOW_UP_TURNS);
+  const answers = history.filter((message) => message.role === "assistant").slice(-FOLLOW_UP_TURNS);
+  // Newest answer first, so its records are loaded first.
+  const recordIds = answers.reverse().flatMap((message) => meta.get(message.id)?.chips.map((chip) => chip.id) ?? []);
+  return {
+    questions: questions.map((message) => message.text),
+    answers: answers.map((message) => message.text),
+    recordIds: [...new Set(recordIds)],
   };
 }
 

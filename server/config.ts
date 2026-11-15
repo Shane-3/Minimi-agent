@@ -96,6 +96,16 @@ export const MODEL_MAX_TOKENS = 8_192;
  */
 export const RECORD_CONTEXT_BUDGET_TOKENS = 20_000;
 
+/**
+ * Earlier turns of a chat sent with each question, at most. Older turns are
+ * left out so a long chat stays fast and inside the model's context; the chat
+ * is a stored record, so its older turns can still be found by search.
+ */
+export const HISTORY_BUDGET_TOKENS = 8_000;
+
+/** How many of a chat's last questions and answers a follow-up carries into the record search. */
+export const FOLLOW_UP_TURNS = 3;
+
 /** Rough token estimate. Good enough for a budget; no tokenizer dependency. */
 export const CHARS_PER_TOKEN = 4;
 

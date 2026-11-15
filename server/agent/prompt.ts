@@ -4,6 +4,7 @@
 import type { MemoryRecord, ThreadMessage } from "../../shared/types.ts";
 import { formatDay, partsInZone, todayIn, type CalendarDate } from "../memory/dates.ts";
 import type { DateFinding, Retrieval } from "../memory/retrieve.ts";
+import { CHARS_PER_TOKEN, HISTORY_BUDGET_TOKENS } from "../config.ts";
 
 /** One turn of the conversation, as plain text. */
 export interface PromptMessage {
@@ -27,6 +28,25 @@ export interface PromptInput {
   now: Date;
   /** Whether web_search is offered, which changes the rules for facts about the present. */
   searchAvailable: boolean;
+  /** True when older turns of the chat were left out of `history` (see fitHistory). */
+  historyTrimmed?: boolean;
+}
+
+/**
+ * The most recent turns that fit `budgetTokens`, oldest first, starting with
+ * a question so no answer is shown without what it answered.
+ */
+export function fitHistory(history: ThreadMessage[], budgetTokens = HISTORY_BUDGET_TOKENS): { kept: ThreadMessage[]; trimmed: boolean } {
+  let used = 0;
+  let start = history.length;
+  while (start > 0) {
+    const cost = Math.ceil(history[start - 1]!.text.length / CHARS_PER_TOKEN);
+    if (used + cost > budgetTokens) break;
+    used += cost;
+    start -= 1;
+  }
+  while (start < history.length && history[start]!.role !== "user") start += 1;
+  return { kept: history.slice(start), trimmed: start > 0 };
 }
 
 // The answer contract (ARCHITECTURE.md §5) and the recall failure cases
@@ -95,7 +115,7 @@ export function rulesFor(searchAvailable: boolean): string {
   return `${RECORD_RULES}\n${searchAvailable ? SEARCH_RULES : NO_SEARCH_RULES}${CLOSING_RULES}`;
 }
 
-export function buildPrompt({ retrieval, question, history, timezone, now, searchAvailable }: PromptInput): Prompt {
+export function buildPrompt({ retrieval, question, history, timezone, now, searchAvailable, historyTrimmed = false }: PromptInput): Prompt {
   const today = todayIn(now, timezone);
   const memory = renderMemory(retrieval, timezone, today);
 
@@ -103,7 +123,7 @@ export function buildPrompt({ retrieval, question, history, timezone, now, searc
   const messages: PromptMessage[] = history.map((message) => ({ role: message.role, content: message.text }));
   messages.push({
     role: "user",
-    content: `${renderTurnContext(retrieval, timezone, now, today)}\n\n<question>\n${question}\n</question>`,
+    content: `${renderTurnContext(retrieval, timezone, now, today, historyTrimmed)}\n\n<question>\n${question}\n</question>`,
   });
 
   // The memory changes only when records change, so rules plus memory form a
@@ -172,8 +192,11 @@ function speakerName(speaker: string): string {
 // ---------------------------------------------------------------------------
 // Per-question context
 
-function renderTurnContext(retrieval: Retrieval, timezone: string, now: Date, today: CalendarDate): string {
+function renderTurnContext(retrieval: Retrieval, timezone: string, now: Date, today: CalendarDate, historyTrimmed: boolean): string {
   const lines = [`Now: ${when(now.toISOString(), timezone, today, true)} (${timezone})`];
+  if (historyTrimmed) {
+    lines.push("Earlier turns of this chat are not shown above. This chat is a stored record, so any of its parts that match the question are in <memory>.");
+  }
 
   if (retrieval.storedRange === null) {
     lines.push("Records stored: none");

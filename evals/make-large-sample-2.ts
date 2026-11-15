@@ -166,7 +166,7 @@ email(9, 2, "Homologation test result", [
 ]);
 
 meeting(9, 4, "11:00", "Launch date decision", [
-  ["Rohan", `The certificate is expected on ${day(11, 2)}, three days after the planned launch. We can't sell without it.`],
+  ["Rohan", `The certificate is expected on ${day(11, 2)}, four days after the planned launch. We can't sell without it.`],
   ["Meghna", "Moving by one week is fine for the campaign if we decide today."],
   ["Kavya", `Then the launch moves from ${FIRST_LAUNCH} to ${LAUNCH}.`],
   ["Ishaan", `Agreed: we launch on ${LAUNCH}. Meghna, please book Riverside Hall for that evening.`],

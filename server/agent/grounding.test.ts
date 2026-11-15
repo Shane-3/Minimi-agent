@@ -241,6 +241,12 @@ describe("checkAnswer: dates", () => {
     expect(right.filter((item) => item.text === "4")).toEqual([]);
   });
 
+  it("leaves a count alone when it points at no date after it", () => {
+    // "two days later" is later than the review, not a gap between these two dates.
+    const checks = check("Agreed at the review on Tue 27 Oct (moved from Mon 30 Nov) and confirmed two days later.");
+    expect(checks.filter((item) => item.text === "two days")).toEqual([]);
+  });
+
   it("counts weeks as seven days", () => {
     expect(only(check("Mon 9 Nov is one week after Mon 2 Nov."), "one week")).toMatchObject({ verified: true });
   });

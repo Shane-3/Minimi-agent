@@ -356,25 +356,29 @@ const DAY_COUNT = new RegExp(
   "gi",
 );
 
-/** The sentence around [from, to): up to the nearest line break or sentence end either side. */
-function sentenceAround(text: string, from: number, to: number): string {
+/** The sentence around [from, to), and where it starts: up to the nearest line break or sentence end either side. */
+function sentenceAround(text: string, from: number, to: number): { start: number; text: string } {
   const before = text.slice(0, from);
   const start = Math.max(before.lastIndexOf("\n"), ...[". ", "! ", "? "].map((end) => before.lastIndexOf(end) + 1)) + 1;
   const after = text.slice(to);
   const ends = ["\n", ". ", "! ", "? "].map((end) => after.indexOf(end)).filter((index) => index >= 0);
-  return text.slice(start, ends.length === 0 ? text.length : to + Math.min(...ends) + 1);
+  return { start, text: text.slice(start, ends.length === 0 ? text.length : to + Math.min(...ends) + 1) };
 }
 
 /**
  * Counts of days between the two dates of a sentence, checked by working the
- * gap out. A count in a sentence without exactly two dates is not checked here.
+ * gap out. The count must point at a date that follows it ("four days after
+ * Thu 15 Oct"); "two days later" names no date, so it is not checked here,
+ * nor is a sentence without exactly two dates.
  */
 function dayCountsIn(text: string, today: CalendarDate): Check[] {
   const checks: Check[] = [];
   for (const match of text.matchAll(DAY_COUNT)) {
-    const dates = datesIn(sentenceAround(text, match.index, match.index + match[0].length))
-      .map((date) => calendarOf(date, today))
-      .filter((date): date is CalendarDate => date !== null);
+    const sentence = sentenceAround(text, match.index, match.index + match[0].length);
+    const found = datesIn(sentence.text);
+    const countEnd = match.index + match[0].length - sentence.start;
+    if (found.length !== 2 || !found.some((date) => date.start >= countEnd)) continue;
+    const dates = found.map((date) => calendarOf(date, today)).filter((date): date is CalendarDate => date !== null);
     if (dates.length !== 2) continue;
     const [a, b] = dates as [CalendarDate, CalendarDate];
     const gap = Math.abs(Date.UTC(a.year, a.month - 1, a.day) - Date.UTC(b.year, b.month - 1, b.day)) / 86_400_000;

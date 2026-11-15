@@ -319,9 +319,10 @@ export function checkAnswer(input: GroundingInput): Check[] {
 
 /**
  * The calendar day a date in the answer means, or null when no such day
- * exists. With no year written, an answer can mean the most recent such day
- * or the next one ("onboarding starts Mon 16 Nov"), so take whichever fits
- * the weekday.
+ * exists. With no year written, it is the occurrence nearest to today, past
+ * or future: "Sat 14 Nov" on Fri 13 Nov is tomorrow, not last year. The
+ * weekday is not used to choose the year, or a wrong weekday could pass by
+ * matching some other year.
  */
 function calendarOf(date: FoundDate, today: CalendarDate): CalendarDate | null {
   const recent = mostRecentMonthDay(today, date.month, date.day).year;
@@ -329,7 +330,9 @@ function calendarOf(date: FoundDate, today: CalendarDate): CalendarDate | null {
   const real = years
     .map((year) => ({ year, month: date.month, day: date.day }))
     .filter((candidate) => isRealDate(candidate));
-  return real.find((candidate) => date.weekday === null || date.weekday === weekdayIndex(candidate)) ?? real[0] ?? null;
+  const distance = (candidate: CalendarDate) =>
+    Math.abs(Date.UTC(candidate.year, candidate.month - 1, candidate.day) - Date.UTC(today.year, today.month - 1, today.day));
+  return real.sort((a, b) => distance(a) - distance(b))[0] ?? null;
 }
 
 function checkDate(date: FoundDate, corpus: Corpus, today: CalendarDate): Check {

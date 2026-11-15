@@ -181,6 +181,11 @@ describe("checkAnswer: dates", () => {
     expect(only(tomorrow, "Sat 14 Nov")).toMatchObject({ verified: true });
   });
 
+  it("does not let a wrong weekday pass by matching another year", () => {
+    // 22 Oct 2026 is a Thursday; 22 Oct 2027 is a Friday, but that is a year away.
+    expect(only(check("Arjun was off on Fri 22 Oct."), "Fri 22 Oct")).toMatchObject({ verified: false, reason: WRONG_WEEKDAY });
+  });
+
   it("flags a date in no record or source", () => {
     expect(only(check("Onboarding starts Sat 14 Nov."), "Sat 14 Nov")).toMatchObject({ verified: false, reason: NOT_FOUND });
   });

@@ -140,6 +140,18 @@ const LAST_STEP_NOTE =
   "No more searches are possible for this answer. Answer now with what you have, and say what is still unchecked.";
 
 /**
+ * The search result as the model sees it. The search time is left out: it is
+ * in UTC, so near midnight it names another day than the user's, and the
+ * model dated sources "checked 15 Nov" on 16 Nov. Today's date is in the
+ * turn context, in the user's timezone.
+ */
+function forModel(result: WebSearchResult | { error: string }): unknown {
+  if (!("searchedAt" in result)) return result;
+  const { searchedAt: _searchedAt, ...rest } = result;
+  return rest;
+}
+
+/**
  * A rate limit whose wait is longer than this is taken to be a daily limit.
  * The API's 429 says which token count ran out but not which window, so the
  * length of the wait it asks for is what tells them apart.
@@ -427,7 +439,7 @@ export function createAgent(options: AgentOptions): Agent {
               for (const page of entity.evidence) if (!evidence.has(page.url)) evidence.set(page.url, page);
             }
           }
-          messages.push({ role: "tool", tool_call_id: call.toolCalls[index]!.id, content: JSON.stringify(result) });
+          messages.push({ role: "tool", tool_call_id: call.toolCalls[index]!.id, content: JSON.stringify(forModel(result)) });
         });
         needsBreak = true;
       }

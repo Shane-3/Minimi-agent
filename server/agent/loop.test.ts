@@ -459,6 +459,8 @@ describe("createAgent with web_search", () => {
     });
     expect(second.at(-1)).toMatchObject({ role: "tool", tool_call_id: "call_0" });
     expect(JSON.parse(second.at(-1)!.content!)).toMatchObject({ entities: [{ entity: "HubSpot", status: "found" }] });
+    // The search time is in UTC; the model dates sources from the turn context instead.
+    expect(JSON.parse(second.at(-1)!.content!)).not.toHaveProperty("searchedAt");
   });
 
   it("reports the entities whose last search failed, and not one that worked when tried again", async () => {

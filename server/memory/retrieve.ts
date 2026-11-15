@@ -133,7 +133,9 @@ export function retrieve(store: Store, message: string, options: RetrieveOptions
 
   const loaded: LoadedRecord[] = [];
   let remaining = budget;
-  for (const id of rankCandidates(dates, topic, focus, index, carriedIds, carriedTopic)) {
+  const { matched, fill } = rankCandidates(dates, topic, focus, index, carriedIds, carriedTopic);
+  const matchedIds = new Set(matched);
+  for (const id of [...new Set([...matched, ...fill])]) {
     if (remaining <= 0) break;
     const size = tokensOf(id);
     const record = store.getRecord(id);
@@ -141,7 +143,7 @@ export function retrieve(store: Store, message: string, options: RetrieveOptions
     if (size <= remaining) {
       loaded.push({ record, partial: false });
       remaining -= size;
-    } else if (size > budget) {
+    } else if (size > budget && matchedIds.has(id)) {
       // Too long to ever load whole: take the parts that match the question.
       const partial = partialRecord(store, record, query ?? carriedQuery, remaining);
       if (partial !== null) {
@@ -306,7 +308,7 @@ function rankCandidates(
   index: RecordSummary[],
   carriedIds: string[],
   carriedTopic: Map<string, TopicMatch>,
-): string[] {
+): { matched: string[]; fill: string[] } {
   const byScore = (matches: Map<string, TopicMatch>) => [...matches.entries()].sort((a, b) => a[1].score - b[1].score).map(([id]) => id);
   const ids = [
     ...focus.map((record) => record.id),
@@ -315,9 +317,17 @@ function rankCandidates(
     ...byScore(topic),
     ...byScore(carriedTopic),
   ];
-  // Nothing matched at all ("summarise everything"): the most recent records.
-  if (ids.length === 0) ids.push(...index.map((record) => record.id));
-  return [...new Set(ids)];
+  // The budget left is then filled, for words the question shares with no
+  // record ("batteries" against "the last 150 packs are in"): first the
+  // rest of the same chat groups and meeting series as the matches, then
+  // the most recent records. The index is newest first. A record too long
+  // to load whole is read in part only when it matched.
+  const titles = new Set(ids.flatMap((id) => index.find((record) => record.id === id)?.title ?? []));
+  const fill = [
+    ...index.filter((record) => titles.has(record.title)).map((record) => record.id),
+    ...index.map((record) => record.id),
+  ];
+  return { matched: [...new Set(ids)], fill };
 }
 
 // ---------------------------------------------------------------------------

@@ -196,6 +196,22 @@ describe("retrieve: over the budget", () => {
     expect(loadedIds(result)).toContain("sample-crm-shortlist");
   });
 
+  it("fills the budget left with the rest of the matched chat group, for words the question does not share", () => {
+    importRecords([
+      { type: "chat", title: "WhatsApp: Workshop", timestamp: "2026-09-16T16:45:00+05:30", turns: [{ speaker: "Arif", text: "250 battery packs received from the supplier." }] },
+      { type: "chat", title: "WhatsApp: Workshop", timestamp: "2026-10-07T15:20:00+05:30", turns: [{ speaker: "Arif", text: "The last 150 packs are in. All 400 received now." }] },
+      // Longer than the whole budget, and about something else.
+      { type: "note", title: "Long notes", timestamp: "2026-11-01T10:00:00+05:30", content: Array.from({ length: 400 }, (_, i) => `Paragraph ${i} about the office plants.`).join("\n\n") },
+    ]);
+    const result = ask("Did all the batteries arrive?", 300);
+    expect(result.allLoaded).toBe(false);
+    // The second message never says "battery", but it is in the same group as the one that does.
+    expect(result.loaded.map((loaded) => loaded.record.segments[0]?.text)).toEqual([
+      "250 battery packs received from the supplier.",
+      "The last 150 packs are in. All 400 received now.",
+    ]);
+  });
+
   it("loads the most recent records when nothing matches", () => {
     loadSample();
     const result = ask("Give me an overview", 400);

@@ -285,6 +285,12 @@ export function checkAnswer(input: GroundingInput): Check[] {
     text = blank(text, quote.start, quote.start + quote.text.length);
   }
 
+  // Before the dates are blanked, since a count is checked against them.
+  for (const count of dayCountsIn(text, today)) {
+    checks.push(count);
+    text = blank(text, count.start, count.start + count.text.length);
+  }
+
   for (const date of datesIn(text)) {
     checks.push(checkDate(date, corpus, today));
     text = blank(text, date.start, date.end);
@@ -311,22 +317,77 @@ export function checkAnswer(input: GroundingInput): Check[] {
   return checks.sort((a, b) => a.start - b.start);
 }
 
-function checkDate(date: FoundDate, corpus: Corpus, today: CalendarDate): Check {
-  const base = { kind: "date" as const, text: date.text, start: date.start };
-  // With no year written, an answer can mean the most recent such day or the
-  // next one ("onboarding starts Mon 16 Nov"), so take whichever fits the weekday.
+/**
+ * The calendar day a date in the answer means, or null when no such day
+ * exists. With no year written, an answer can mean the most recent such day
+ * or the next one ("onboarding starts Mon 16 Nov"), so take whichever fits
+ * the weekday.
+ */
+function calendarOf(date: FoundDate, today: CalendarDate): CalendarDate | null {
   const recent = mostRecentMonthDay(today, date.month, date.day).year;
   const years = date.year !== null ? [date.year] : [recent, recent + 1];
   const real = years
     .map((year) => ({ year, month: date.month, day: date.day }))
     .filter((candidate) => isRealDate(candidate));
-  if (real.length === 0) return { ...base, verified: false, reason: NOT_A_DATE };
-  const calendar = real.find((candidate) => date.weekday === null || date.weekday === weekdayIndex(candidate)) ?? real[0]!;
+  return real.find((candidate) => date.weekday === null || date.weekday === weekdayIndex(candidate)) ?? real[0] ?? null;
+}
+
+function checkDate(date: FoundDate, corpus: Corpus, today: CalendarDate): Check {
+  const base = { kind: "date" as const, text: date.text, start: date.start };
+  const calendar = calendarOf(date, today);
+  if (calendar === null) return { ...base, verified: false, reason: NOT_A_DATE };
   if (date.weekday !== null && date.weekday !== weekdayIndex(calendar)) {
     return { ...base, verified: false, reason: WRONG_WEEKDAY };
   }
   const known = date.year === null ? corpus.monthDays.has(monthDayKey(date.month, date.day)) : corpus.days.has(dayKey(calendar));
   return known ? { ...base, verified: true } : { ...base, verified: false, reason: NOT_FOUND };
+}
+
+// ---------------------------------------------------------------------------
+// Day counts: "Mon 19 Oct, four days after Thu 15 Oct"
+
+// A count tied to a relation between two days. "Within five weeks" is not
+// one, so it is left to the figure check.
+const DAY_COUNT = new RegExp(
+  String.raw`\b(\d+|${Object.keys(NUMBER_WORDS).join("|")})[ \t]+(days?|weeks?)[ \t]+(?:after|before|later|earlier|from|since|until|ahead of|behind)\b`,
+  "gi",
+);
+
+/** The sentence around [from, to): up to the nearest line break or sentence end either side. */
+function sentenceAround(text: string, from: number, to: number): string {
+  const before = text.slice(0, from);
+  const start = Math.max(before.lastIndexOf("\n"), ...[". ", "! ", "? "].map((end) => before.lastIndexOf(end) + 1)) + 1;
+  const after = text.slice(to);
+  const ends = ["\n", ". ", "! ", "? "].map((end) => after.indexOf(end)).filter((index) => index >= 0);
+  return text.slice(start, ends.length === 0 ? text.length : to + Math.min(...ends) + 1);
+}
+
+/**
+ * Counts of days between the two dates of a sentence, checked by working the
+ * gap out. A count in a sentence without exactly two dates is not checked here.
+ */
+function dayCountsIn(text: string, today: CalendarDate): Check[] {
+  const checks: Check[] = [];
+  for (const match of text.matchAll(DAY_COUNT)) {
+    const dates = datesIn(sentenceAround(text, match.index, match.index + match[0].length))
+      .map((date) => calendarOf(date, today))
+      .filter((date): date is CalendarDate => date !== null);
+    if (dates.length !== 2) continue;
+    const [a, b] = dates as [CalendarDate, CalendarDate];
+    const gap = Math.abs(Date.UTC(a.year, a.month - 1, a.day) - Date.UTC(b.year, b.month - 1, b.day)) / 86_400_000;
+    const word = match[1]!.toLowerCase();
+    const count = /^\d+$/.test(word) ? Number(word) : NUMBER_WORDS[word]!;
+    const claimed = match[2]!.toLowerCase().startsWith("week") ? count * 7 : count;
+    const phrase = `${match[1]} ${match[2]}`;
+    checks.push({
+      kind: "figure",
+      text: phrase,
+      start: match.index,
+      verified: claimed === gap,
+      ...(claimed === gap ? {} : { reason: `These dates are ${gap} ${gap === 1 ? "day" : "days"} apart` }),
+    });
+  }
+  return checks;
 }
 
 // ---------------------------------------------------------------------------

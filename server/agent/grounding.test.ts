@@ -227,6 +227,27 @@ describe("checkAnswer: dates", () => {
     ]);
   });
 
+  it("checks a count of days between the two dates of a sentence", () => {
+    // Thu 5 Nov to Mon 9 Nov is 4 days.
+    const wrong = check("Onboarding starts Mon 9 Nov, six days after the call on Thu 5 Nov.");
+    expect(only(wrong, "six days")).toMatchObject({ kind: "figure", verified: false, reason: "These dates are 4 days apart" });
+    const right = check("Onboarding starts Mon 9 Nov, 4 days after the call on Thu 5 Nov.");
+    expect(only(right, "4 days")).toMatchObject({ verified: true });
+    expect(right.filter((item) => item.text === "4")).toEqual([]);
+  });
+
+  it("counts weeks as seven days", () => {
+    expect(only(check("Mon 9 Nov is one week after Mon 2 Nov."), "one week")).toMatchObject({ verified: true });
+  });
+
+  it("leaves a count alone when it is not a gap between two dates", () => {
+    // "Within five weeks" is a duration, not a gap between the two dates.
+    const checks = check("Agreed on Thu 5 Nov: onboarding starts Mon 9 Nov and finishes within five weeks.");
+    expect(checks.filter((item) => item.text.includes("week"))).toEqual([]);
+    // One date only: the count cannot be worked out, so it is not marked.
+    expect(check("It shipped 4 days after Thu 5 Nov.").filter((item) => item.text === "4 days")).toEqual([]);
+  });
+
   it("does not check the numbers inside a date as figures", () => {
     expect(check("Agreed on Thu 5 Nov.").filter((item) => item.kind === "figure")).toEqual([]);
   });

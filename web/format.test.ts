@@ -8,6 +8,11 @@ describe("format", () => {
     expect(dayLabel("2026-11-08T20:00:00Z", "UTC")).toBe("Sun 8 Nov");
   });
 
+  it("writes September as Sep, as the answers do, whatever the browser's own wording", () => {
+    expect(dayLabel("2026-09-14T06:00:00Z", "Asia/Kolkata")).toBe("Mon 14 Sep");
+    expect(dayLabel("2025-09-14T00:00:00Z", "UTC", true)).toBe("Sun 14 Sep 2025");
+  });
+
   it("shows a 24-hour time", () => {
     expect(timeLabel("2026-11-09T04:00:00Z", "Asia/Kolkata")).toBe("09:30");
   });

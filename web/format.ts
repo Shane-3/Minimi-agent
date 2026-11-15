@@ -5,13 +5,26 @@ export function browserTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-/** "Mon 9 Nov". */
-export function dayLabel(iso: string, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone }).formatToParts(
+// Fixed names, as the server writes them in answers: browsers differ (some
+// write "Sept"), and a chip must match the answer beside it.
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** The calendar day of an instant in a timezone. */
+function calendarDay(iso: string, timeZone: string): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat("en-GB", { year: "numeric", month: "numeric", day: "numeric", timeZone }).formatToParts(
     new Date(iso),
   );
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
-  return `${part("weekday")} ${part("day")} ${part("month")}`;
+  const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((item) => item.type === type)?.value);
+  return { year: part("year"), month: part("month"), day: part("day") };
+}
+
+/** "Mon 9 Nov", or "Mon 9 Nov 2025" with `withYear`. */
+export function dayLabel(iso: string, timeZone: string, withYear = false): string {
+  const { year, month, day } = calendarDay(iso, timeZone);
+  const weekday = WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+  const label = `${weekday} ${day} ${MONTHS[month - 1]}`;
+  return withYear ? `${label} ${year}` : label;
 }
 
 /** "09:30", 24-hour. */

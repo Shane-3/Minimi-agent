@@ -1,18 +1,13 @@
 import type { Source } from "../../shared/types.ts";
+import { dayLabel } from "../format.ts";
 import styles from "./Sources.module.css";
 
 /**
  * "Mon 9 Nov" from a YYYY-MM-DD page date, with the year when it is not this
- * year (a page can be years old). A calendar day, so no timezone applies.
+ * year (a page can be years old). A calendar day, so it is read in UTC.
  */
 function sourceDate(day: string): string {
-  const [year, month, date] = day.split("-").map(Number);
-  const utc = new Date(Date.UTC(year!, month! - 1, date!));
-  const parts = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
-    .formatToParts(utc);
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
-  const label = `${part("weekday")} ${part("day")} ${part("month")}`;
-  return year === new Date().getFullYear() ? label : `${label} ${part("year")}`;
+  return dayLabel(`${day}T00:00:00Z`, "UTC", Number(day.slice(0, 4)) !== new Date().getFullYear());
 }
 
 /** The web pages an answer links to: site, title and date or "undated" (U4). */

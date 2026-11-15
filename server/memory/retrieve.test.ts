@@ -108,6 +108,16 @@ describe("retrieve: when everything fits", () => {
     ]);
     expect(result.dates[0]?.nearestId).toBeUndefined();
     expect(result.focus).toEqual([]);
+    // Before the first record: only a later day with records.
+    expect(result.dates[0]?.before).toBeUndefined();
+    expect(result.dates[0]?.after).toBe("2026-10-29T05:30:00.000Z");
+  });
+
+  it("gives the nearest days with any records either side of an empty date", () => {
+    const result = ask("What happened on Wednesday?");
+    expect(result.dates[0]).toMatchObject({ label: "Wed 4 Nov", recordIds: [] });
+    expect(result.dates[0]?.before?.slice(0, 10)).toBe("2026-11-03");
+    expect(result.dates[0]?.after?.slice(0, 10)).toBe("2026-11-05");
   });
 
   it("offers the nearest record on the same topic when the date has none", () => {

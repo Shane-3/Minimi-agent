@@ -26,6 +26,13 @@ export interface DateFinding {
   earlier?: { label: string; recordIds: string[] };
   /** When nothing is on that date: the record on the same topic closest in time to it. */
   nearestId?: string;
+  /**
+   * When nothing is on that date: the start of the last record before it and
+   * of the first after it, whatever their topic, so the answer can name the
+   * nearest days with records without working them out itself.
+   */
+  before?: string;
+  after?: string;
 }
 
 export interface LoadedRecord {
@@ -207,6 +214,12 @@ function findDate(date: ResolvedDate, index: RecordSummary[], topic: Map<string,
       .filter((record) => topic.has(record.id))
       .sort((a, b) => Math.abs(Date.parse(a.startedAt) - middle) - Math.abs(Date.parse(b.startedAt) - middle))[0];
     if (nearest !== undefined) finding.nearestId = nearest.id;
+
+    const starts = index.map((record) => record.startedAt).sort();
+    const before = starts.filter((start) => start < date.from).at(-1);
+    const after = starts.find((start) => start >= date.to);
+    if (before !== undefined) finding.before = before;
+    if (after !== undefined) finding.after = after;
   }
 
   return finding;

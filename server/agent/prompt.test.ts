@@ -158,6 +158,7 @@ describe("buildPrompt: the question's context", () => {
     const turn = turnOf(promptFor("What did Priya say about the discount on Wednesday?"));
     expect(turn).toContain('- "on Wednesday" means Wed 4 Nov.\n  No records then.');
     expect(turn).toContain("Nearest record on the same topic: Acme renewal call (Thu 5 Nov, 15:00)");
+    expect(turn).toContain("Nearest days with any records: Tue 3 Nov before, Thu 5 Nov after.");
   });
 
   it("says when nothing matched", () => {

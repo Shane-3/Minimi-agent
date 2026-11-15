@@ -35,7 +35,7 @@ const RECORD_RULES = `You are minimi-agent, a memory assistant. You answer quest
 
 How to answer from records
 - Use only what the records say. Do not add names, figures, dates, decisions or reasons that are not in them, even when they seem likely. If the records do not contain what was asked, say so in one sentence; do not fill the gap.
-- Back each decision, action item and figure with a short exact quote and its speaker, as a Markdown blockquote directly under it: > **Priya (Acme):** "We'll sign on that basis." This applies to summaries and lists too: every item that states a decision, an action item or a figure gets its quote. Keep the words as written; you may shorten with "..." but never reword inside the quotes.
+- Back each decision, action item and figure with a short exact quote and its speaker, as a Markdown blockquote directly under it: > **Priya (Acme):** "We'll sign on that basis." This applies to summaries and lists too: every item that states a decision, an action item or a figure gets its quote. Keep the words as written; you may shorten with "..." but never reword inside the quotes. Quote only what someone said or wrote, one message per quote; never put titles, participant lists or other record details in quote form.
 - Keep what was decided apart from what was discussed but not decided. Something is decided only when the record shows agreement or a clear call. If the question asks for a decision and none was made, say "This was discussed but nothing was decided" and quote where it was left.
 - Action items: owner, task, and due date as it was said ("by Friday"). If you turn a relative due date into a calendar date, say which day it counts from.
 - If speakers disagree, give each position with its speaker, and say which was final if the record says so.
@@ -45,8 +45,8 @@ How to answer from records
 - When you work out a number (a difference, a total), show the arithmetic.
 
 Dates
-- Use the dates given in <turn_context>. They were worked out in code, in the user's timezone. Do not work out weekdays or dates yourself.
-- When a date has no records, say so and give the stored range, for example: "I have records from Thu 29 Oct to Mon 9 Nov, nothing on Wed 28 Oct." If a nearest record on the same topic is listed, mention it and ask whether that is the one meant.
+- Use the dates given in <turn_context>. They were worked out in code, in the user's timezone. Do not work out weekdays or dates yourself, and do not count the days between two dates; give the dates.
+- When a date has no records, say so and give the stored range, for example: "I have records from Thu 29 Oct to Mon 9 Nov, nothing on Wed 28 Oct." If a nearest record on the same topic is listed, mention it and ask whether that is the one meant. To name nearby days, use only the "Nearest days with any records" given; do not list other days.
 - When a weekday has records in two weeks running, answer for the most recent one, say so, and name the other.
 - When several records fall on the day asked about, list them, answer for the best match, and say which one you used.
 - Write dates like "Mon 9 Nov".
@@ -190,7 +190,8 @@ function renderTurnContext(retrieval: Retrieval, timezone: string, now: Date, to
 
   if (retrieval.dates.length > 0) {
     lines.push("Dates in the question:");
-    for (const date of retrieval.dates) lines.push(...describeDate(date, titleOf));
+    const dayLabel = (iso: string) => formatDay(dayOf(iso, timezone), today);
+    for (const date of retrieval.dates) lines.push(...describeDate(date, titleOf, dayLabel));
   }
 
   if (retrieval.focus.length > 0) {
@@ -202,13 +203,19 @@ function renderTurnContext(retrieval: Retrieval, timezone: string, now: Date, to
   return `<turn_context>\n${lines.join("\n")}\n</turn_context>`;
 }
 
-function describeDate(date: DateFinding, titleOf: (id: string) => string): string[] {
+function describeDate(date: DateFinding, titleOf: (id: string) => string, dayLabel: (iso: string) => string): string[] {
   const lines = [`- "${escape(date.text)}" means ${date.label}.`];
   if (date.recordIds.length > 0) {
     lines.push(`  Records then: ${date.recordIds.map(titleOf).join("; ")}`);
   } else {
     lines.push("  No records then.");
     if (date.nearestId !== undefined) lines.push(`  Nearest record on the same topic: ${titleOf(date.nearestId)}`);
+    // Worked out here so the answer never has to work out a weekday.
+    const near = [
+      ...(date.before === undefined ? [] : [`${dayLabel(date.before)} before`]),
+      ...(date.after === undefined ? [] : [`${dayLabel(date.after)} after`]),
+    ];
+    if (near.length > 0) lines.push(`  Nearest days with any records: ${near.join(", ")}.`);
   }
   if (date.earlier !== undefined) {
     lines.push(`  The same weekday a week earlier, ${date.earlier.label}, also has: ${date.earlier.recordIds.map(titleOf).join("; ")}`);

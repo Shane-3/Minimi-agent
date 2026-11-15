@@ -2,12 +2,12 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 import express from "express";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiError, ChatEvent, Check, Evidence, ThreadMessage } from "../../shared/types.ts";
 import type { GroundingInput } from "../agent/grounding.ts";
 import { AgentError, type Agent, type AnswerRequest, type AnswerResult } from "../agent/loop.ts";
 import { createApi } from "../api.ts";
-import { Store } from "../memory/store.ts";
+import { Store, StoreError } from "../memory/store.ts";
 
 const SAMPLE_PATH = fileURLToPath(new URL("../../data/sample.json", import.meta.url));
 const KOLKATA = "Asia/Kolkata";
@@ -335,6 +335,31 @@ describe("POST /api/chat", () => {
     expect(events.at(-1)).toMatchObject({ type: "error", code: "incomplete", retryable: true });
     const threadId = (events.at(-1) as { threadId: string }).threadId;
     expect(store.getRecord(threadId)?.segments).toHaveLength(1);
+  });
+
+  it("still answers when the chat can't be saved, and says it wasn't saved", async () => {
+    await start(fakeAgent(streams(["From the records."])).agent);
+    vi.spyOn(store, "appendSegment").mockImplementation(() => {
+      throw new StoreError("Could not save the message.");
+    });
+    const events = await ask({ message: "What did we decide?" });
+    expect(events.filter((event) => event.type === "delta")).toEqual([{ type: "delta", text: "From the records." }]);
+    // messageId null is what the UI turns into "This chat can't be saved right now. You can keep talking."
+    expect(events.at(-1)).toMatchObject({ type: "done", messageId: null });
+  });
+
+  it("says plainly when the records can't be read", async () => {
+    await start(fakeAgent(streams(["unused"])).agent);
+    vi.spyOn(store, "getRecord").mockImplementation(() => {
+      throw new StoreError("Could not read a record.");
+    });
+    const events = await ask({ message: "What did we decide?" });
+    expect(events.at(-1)).toMatchObject({
+      type: "error",
+      code: "database_error",
+      message: "Your records can't be read right now. Try again.",
+      retryable: true,
+    });
   });
 
   it("ends quietly when the user stops", async () => {

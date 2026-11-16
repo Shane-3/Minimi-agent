@@ -173,6 +173,17 @@ describe("createAgent", () => {
     expect((await agent.answer({ ...prompt, onText: () => {} })).stopReason).toBe("max_tokens");
   });
 
+  it("asks again once when a reply comes back empty, instead of showing a blank answer", async () => {
+    const { agent, calls } = agentWith([{ text: [] }, { text: ["Here it is."] }]);
+    expect((await agent.answer({ ...prompt, onText: () => {} })).text).toBe("Here it is.");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("fails with Retry when the reply is empty twice", async () => {
+    const { agent } = agentWith([{ text: [] }, { text: [] }]);
+    await expect(agent.answer({ ...prompt, onText: () => {} })).rejects.toMatchObject({ code: "unavailable", retryable: true });
+  });
+
   it("retries once after an overload that happened before any text", async () => {
     vi.useFakeTimers();
     const { agent, calls } = agentWith([failsWith(overloaded()), { text: ["ok"] }]);

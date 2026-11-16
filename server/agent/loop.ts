@@ -391,20 +391,32 @@ export function createAgent(options: AgentOptions): Agent {
         const withTools = options.webSearch !== undefined && !lastStep;
         if (lastStep && step > 1) messages.push({ role: "user", content: LAST_STEP_NOTE });
 
-        let call: CallResult;
-        try {
-          call = await callModel(messages, withTools, searches > 0, callRequest);
-        } catch (error) {
-          // The partial text of an answer is everything sent so far, not just this call's.
-          if (error instanceof AgentError) {
-            throw new AgentError(error.code, error.message, {
-              retryable: error.retryable,
-              partialText: text,
-              cause: error.cause,
-              retryAfterMs: error.retryAfterMs,
-            });
+        const callOnce = async (): Promise<CallResult> => {
+          try {
+            return await callModel(messages, withTools, searches > 0, callRequest);
+          } catch (error) {
+            // The partial text of an answer is everything sent so far, not just this call's.
+            if (error instanceof AgentError) {
+              throw new AgentError(error.code, error.message, {
+                retryable: error.retryable,
+                partialText: text,
+                cause: error.cause,
+                retryAfterMs: error.retryAfterMs,
+              });
+            }
+            throw error;
           }
-          throw error;
+        };
+
+        let call = await callOnce();
+        // A reply with no text and no search (it happened after a search) would
+        // show as a blank answer. Nothing has reached the user yet, so it is
+        // asked again once; a second empty reply is a failure with Retry.
+        if (call.toolCalls.length === 0 && text === "") {
+          call = await callOnce();
+          if (call.toolCalls.length === 0 && text === "") {
+            throw new AgentError("unavailable", UNAVAILABLE_MESSAGE, { retryable: true });
+          }
         }
 
         if (call.toolCalls.length === 0 || !withTools) {

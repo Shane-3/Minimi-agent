@@ -95,6 +95,12 @@ describe("AssistantMessage", () => {
     expect(render({ text: "Done.", searchFailed: { entities: ["HubSpot"], retryable: true } }, null, null)).not.toContain("Check again");
   });
 
+  it("offers Copy once the answer has stopped streaming", () => {
+    expect(render({ text: "Done.", phase: "complete" })).toContain(">Copy</button>");
+    expect(render({ text: "Part", phase: "streaming" })).not.toContain(">Copy</button>");
+    expect(render({ text: "", phase: "error", error: { message: "Failed.", retryable: true } })).not.toContain(">Copy</button>");
+  });
+
   it("offers no Retry on an answer that is not the last", () => {
     expect(render({ text: "Part", phase: "incomplete" }, null)).not.toContain("Retry");
   });

@@ -6,6 +6,7 @@ import styles from "./App.module.css";
 import { Banner } from "./components/Banner.tsx";
 import { Composer } from "./components/Composer.tsx";
 import { Header } from "./components/Header.tsx";
+import { ImportDialog } from "./components/ImportDialog.tsx";
 import { MessageList } from "./components/MessageList.tsx";
 import { RecordsPanel, type ViewedRecord } from "./components/RecordsPanel.tsx";
 import { WelcomeCard } from "./components/WelcomeCard.tsx";
@@ -55,6 +56,7 @@ export function App() {
   const [startedWithout, setStartedWithout] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [viewing, setViewing] = useState<ViewedRecord | null>(null);
   const [atBottom, setAtBottom] = useState(true);
 
@@ -233,6 +235,12 @@ export function App() {
 
   const openChip = (chip: MemoryChip, quotes: string[]) => openPanel({ id: chip.id, quotes });
 
+  // The dialog starts clean, unless an upload is still running.
+  const openImport = () => {
+    if (records.import.phase !== "importing") dispatchRecords({ type: "import_dismissed" });
+    setImportOpen(true);
+  };
+
   const blocked = !online ? "offline" : health?.cerebras === false ? "missing_key" : null;
   const showWelcome = chat.messages.length === 0 && !startedWithout && !restoring && records.phase !== "loading";
   const last = chat.messages.at(-1);
@@ -245,6 +253,7 @@ export function App() {
       <Header
         recordCount={records.phase === "ready" ? records.records.length : null}
         onOpenRecords={() => openPanel(null)}
+        onOpenImport={() => openImport()}
         onNewChat={newChat}
         recordsRef={recordsButton}
       />
@@ -269,6 +278,7 @@ export function App() {
               timezone={timezone}
               onLoadSample={() => void loadSample()}
               onUpload={upload}
+              onOpenImport={() => openImport()}
               onDrag={(over) => dispatchRecords({ type: "drag", over })}
               onStartWithout={() => {
                 setStartedWithout(true);
@@ -320,7 +330,16 @@ export function App() {
         onRemove={(id) => void remove(id)}
         onClearAll={() => void clearAll()}
         onLoadSample={() => void loadSample()}
+        onOpenImport={() => openImport()}
+      />
+
+      <ImportDialog
+        open={importOpen}
+        importState={records.import}
+        timezone={timezone}
         onUpload={upload}
+        onDrag={(over) => dispatchRecords({ type: "drag", over })}
+        onClose={() => setImportOpen(false)}
       />
     </div>
   );

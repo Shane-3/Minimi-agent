@@ -18,6 +18,7 @@ const render = (stored: RecordSummary[], importState: ImportState) =>
       timezone={KOLKATA}
       onLoadSample={() => {}}
       onUpload={() => {}}
+      onOpenImport={() => {}}
       onDrag={() => {}}
       onStartWithout={() => {}}
       onAsk={() => {}}

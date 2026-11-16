@@ -1,4 +1,4 @@
-import { useRef, type DragEvent } from "react";
+import type { DragEvent } from "react";
 import type { RecordSummary } from "../../shared/types.ts";
 import { count, rangeLabel } from "../format.ts";
 import type { ImportState } from "../state/records.ts";
@@ -10,15 +10,17 @@ interface WelcomeCardProps {
   importState: ImportState;
   timezone: string;
   onLoadSample: () => void;
+  /** A file dropped on the card is uploaded straight away. */
   onUpload: (file: File) => void;
+  /** Opens the upload dialog, which explains the file format. */
+  onOpenImport: () => void;
   onDrag: (over: boolean) => void;
   onStartWithout: () => void;
   onAsk: (question: string) => void;
 }
 
 /** First screen: load history, or ask about what is loaded (U1, U7). */
-export function WelcomeCard({ records, importState, timezone, onLoadSample, onUpload, onDrag, onStartWithout, onAsk }: WelcomeCardProps) {
-  const fileInput = useRef<HTMLInputElement>(null);
+export function WelcomeCard({ records, importState, timezone, onLoadSample, onUpload, onOpenImport, onDrag, onStartWithout, onAsk }: WelcomeCardProps) {
   const importing = importState.phase === "importing";
   const dragging = importState.phase === "dragging";
 
@@ -57,7 +59,7 @@ export function WelcomeCard({ records, importState, timezone, onLoadSample, onUp
           <button type="button" className="button button-primary" onClick={onLoadSample} disabled={importing}>
             Load sample history
           </button>
-          <button type="button" className="button" onClick={() => fileInput.current?.click()} disabled={importing}>
+          <button type="button" className="button" onClick={onOpenImport} disabled={importing}>
             Upload JSON
           </button>
           <button type="button" className="link-button" onClick={onStartWithout} disabled={importing}>
@@ -105,18 +107,6 @@ export function WelcomeCard({ records, importState, timezone, onLoadSample, onUp
         </div>
       )}
 
-      <input
-        ref={fileInput}
-        type="file"
-        accept=".json,application/json"
-        hidden
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          // Cleared so choosing the same file again still fires a change.
-          event.target.value = "";
-          if (file !== undefined) onUpload(file);
-        }}
-      />
     </section>
   );
 }

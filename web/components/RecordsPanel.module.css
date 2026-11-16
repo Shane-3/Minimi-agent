@@ -213,3 +213,29 @@
     padding-right: var(--space-4);
   }
 }
+
+.search {
+  flex: none;
+  padding: var(--space-3) var(--space-6) 0;
+}
+
+.searchInput {
+  width: 100%;
+  height: 38px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-size: 14px;
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+@media (max-width: 719px) {
+  .search {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+}

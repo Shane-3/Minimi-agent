@@ -45,7 +45,7 @@ Orange text on white is used at 13px medium or larger only for interactive items
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ ◣ minimi-agent                         Records (4)   New chat │  header, 56px, bottom border
+│ ◣ minimi-agent          Upload JSON   Records (4)   New chat │  header, 56px, bottom border
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
 │               ┌──────── 680px column ────────┐               │
@@ -74,6 +74,7 @@ Orange text on white is used at 13px medium or larger only for interactive items
 - **User message**: `--surface` block, right-aligned, max 80% width, radius 10px.
 - **Assistant message**: plain text in the column, no bubble, no avatar.
   - Order inside one answer: memory chips → answer text → sources → verification note.
+  - A small "Copy" button under a finished answer copies its text.
 - **Status line**: 13px muted text with a small orange dot, replaced in place as steps change. Removed when the first answer text arrives. No animation beyond a slow opacity pulse on the dot (off under reduced motion).
 
 ### Memory chip
@@ -98,9 +99,15 @@ Orange text on white is used at 13px medium or larger only for interactive items
 - While streaming, Send becomes **Stop**.
 - Character counter appears from 3,500; hard limit 4,000.
 
+### Upload dialog
+- Opened by "Upload JSON" in the header, on the welcome card and in the records panel.
+- Shows how to shape a file: a short example (the same one offered as "Download this example", and imported by a test so it always works), each field with whether it is required, and notes on timezones, duplicates, chat exports and all-or-nothing imports.
+- "Choose JSON file", or drop a file on it. The result (summary and warnings) or the error (record and field to fix) shows in the dialog.
+
 ### Records panel
 - List grouped by date, newest first: type label (Meeting, Chat, Note), title, time.
-- Each row: open, remove (with confirm). Footer: "Upload JSON", "Clear all" (with confirm).
+- A search box filters by title, type, day or person.
+- Each row: open, remove (with confirm). Footer: "Upload JSON" (opens the upload dialog), "Clear all" (with confirm).
 - Empty state: "No records yet", with the two load buttons.
 
 ### Record viewer
@@ -114,7 +121,8 @@ Orange text on white is used at 13px medium or larger only for interactive items
 | Import | invalid JSON, wrong shape, empty, duplicate, too large, timezone assumed |
 | Message (assistant) | status only, streaming, complete, stopped, incomplete (connection lost), error with Retry |
 | Composer | empty, typing, sending, streaming (Stop), offline, over limit |
-| Records panel | loading, empty, list, removing, error |
+| Upload dialog | idle, dragging file, importing, success with warnings, error with details |
+| Records panel | loading, empty, list, filtered, no match, removing, error |
 | App | missing key notice, offline banner, database error notice |
 
 ## 6. Interface copy
@@ -161,6 +169,6 @@ web/
   components/
     Header  WelcomeCard  MessageList  UserMessage  AssistantMessage
     StatusLine  MemoryChip  Quote  Sources  VerificationNote
-    Composer  RecordsPanel  RecordViewer  Banner  ConfirmDialog
+    Composer  RecordsPanel  RecordViewer  ImportDialog  Banner  ConfirmDialog
   assets/mark.svg      original cat-ear mark
 ```

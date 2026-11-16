@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Check, MemoryChip as Chip } from "../../shared/types.ts";
@@ -61,7 +61,32 @@ export function AssistantMessage({ message, timezone, onOpenChip, onRetry, onChe
       {message.checks !== undefined && <VerificationNote checks={message.checks} />}
 
       <Ending message={message} onRetry={onRetry} />
+      {message.text !== "" && message.phase !== "pending" && message.phase !== "streaming" && <CopyButton text={message.text} />}
     </article>
+  );
+}
+
+/** Copies the answer as written (Markdown), for pasting into an email or a doc. */
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className={styles.copy}
+      onClick={() => {
+        // Clipboard access can be refused (an insecure page, a denied
+        // permission); then the button just does not confirm.
+        navigator.clipboard.writeText(text).then(
+          () => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          },
+          () => {},
+        );
+      }}
+    >
+      {copied ? "Copied" : "Copy"}
+    </button>
   );
 }
 

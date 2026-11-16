@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { RecordSummary } from "../../shared/types.ts";
-import { count, dayLabel, rangeLabel, timeLabel } from "../format.ts";
+import { dayLabel, timeLabel } from "../format.ts";
 import type { RecordsState } from "../state/records.ts";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import styles from "./RecordsPanel.module.css";
@@ -24,20 +24,28 @@ interface RecordsPanelProps {
   onRemove: (id: string) => void;
   onClearAll: () => void;
   onLoadSample: () => void;
-  onUpload: (file: File) => void;
+  /** Opens the upload dialog, which explains the file format. */
+  onOpenImport: () => void;
 }
 
 type Confirming = { kind: "remove"; id: string } | { kind: "clear" } | null;
+
+/** The words a record is found by in the search box: its title, type and day. */
+export function matchesFilter(record: RecordSummary, filter: string, timezone: string): boolean {
+  const words = filter.toLowerCase().split(/\s+/).filter((word) => word !== "");
+  const text = `${record.title} ${TYPE_LABELS[record.type]} ${dayLabel(record.startedAt, timezone)} ${record.participants.join(" ")}`.toLowerCase();
+  return words.every((word) => text.includes(word));
+}
 
 /**
  * Stored records, newest first, grouped by day. A modal <dialog>: it takes
  * focus, closes on Escape, and the browser returns focus to the trigger.
  */
 export function RecordsPanel(props: RecordsPanelProps) {
-  const { open, state, timezone, viewing, onView, onClose, onReload, onRemove, onClearAll, onLoadSample, onUpload } = props;
+  const { open, state, timezone, viewing, onView, onClose, onReload, onRemove, onClearAll, onLoadSample, onOpenImport } = props;
   const dialog = useRef<HTMLDialogElement>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
   const [confirming, setConfirming] = useState<Confirming>(null);
+  const [filter, setFilter] = useState("");
   const importing = state.import.phase === "importing";
 
   useEffect(() => {
@@ -48,7 +56,7 @@ export function RecordsPanel(props: RecordsPanelProps) {
   }, [open]);
 
   const uploadButton = (
-    <button type="button" className="button" onClick={() => fileInput.current?.click()} disabled={importing}>
+    <button type="button" className="button" onClick={onOpenImport} disabled={importing}>
       Upload JSON
     </button>
   );
@@ -80,12 +88,29 @@ export function RecordsPanel(props: RecordsPanelProps) {
           </button>
         </div>
 
+        {viewing === null && state.phase === "ready" && state.records.length > 0 && (
+          <div className={styles.search}>
+            <label htmlFor="records-filter" className="sr-only">
+              Search records
+            </label>
+            <input
+              id="records-filter"
+              type="search"
+              className={styles.searchInput}
+              placeholder="Search by title, person, type or day"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+            />
+          </div>
+        )}
+
         <div className={styles.body}>
           {viewing !== null ? (
             <RecordViewer recordId={viewing.id} quotes={viewing.quotes} timezone={timezone} onBack={() => onView(null)} />
           ) : (
             <RecordList
               state={state}
+              filter={filter}
               timezone={timezone}
               onView={onView}
               onReload={onReload}
@@ -106,7 +131,6 @@ export function RecordsPanel(props: RecordsPanelProps) {
 
         {viewing === null && (
           <div className={styles.footer}>
-            <ImportStatus state={state} timezone={timezone} />
             {state.actionError !== null && (
               <p className={styles.error} role="alert">
                 {state.actionError}
@@ -126,19 +150,6 @@ export function RecordsPanel(props: RecordsPanelProps) {
           </div>
         )}
       </div>
-
-      <input
-        ref={fileInput}
-        type="file"
-        accept=".json,application/json"
-        hidden
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          // Cleared so choosing the same file again still fires a change.
-          event.target.value = "";
-          if (file !== undefined) onUpload(file);
-        }}
-      />
 
       <ConfirmDialog
         open={confirming !== null}
@@ -161,6 +172,7 @@ export function RecordsPanel(props: RecordsPanelProps) {
 
 interface RecordListProps {
   state: RecordsState;
+  filter: string;
   timezone: string;
   onView: (record: ViewedRecord) => void;
   onReload: () => void;
@@ -169,7 +181,7 @@ interface RecordListProps {
   children: ReactNode;
 }
 
-function RecordList({ state, timezone, onView, onReload, onAskRemove, children }: RecordListProps) {
+function RecordList({ state, filter, timezone, onView, onReload, onAskRemove, children }: RecordListProps) {
   if (state.phase === "loading") return <p className="meta">Loading records</p>;
   if (state.phase === "error") {
     return (
@@ -183,15 +195,23 @@ function RecordList({ state, timezone, onView, onReload, onAskRemove, children }
   }
   if (state.records.length === 0) return <>{children}</>;
 
+  const shown = state.records.filter((record) => matchesFilter(record, filter, timezone));
+  if (shown.length === 0) return <p className="meta">No records match "{filter.trim()}".</p>;
+
   // The server lists newest first, so groups come out newest first too.
   const groups = new Map<string, RecordSummary[]>();
-  for (const record of state.records) {
+  for (const record of shown) {
     const day = dayLabel(record.startedAt, timezone);
     groups.set(day, [...(groups.get(day) ?? []), record]);
   }
 
   return (
     <div className={styles.groups}>
+      {filter.trim() !== "" && (
+        <p className="meta" role="status">
+          {shown.length} of {state.records.length} records
+        </p>
+      )}
       {[...groups].map(([day, records]) => (
         <section key={day} aria-label={day}>
           <h3 className={styles.day}>{day}</h3>
@@ -230,44 +250,4 @@ function RecordList({ state, timezone, onView, onReload, onAskRemove, children }
       ))}
     </div>
   );
-}
-
-/** An upload: in progress, its result, or why it failed. */
-function ImportStatus({ state, timezone }: { state: RecordsState; timezone: string }) {
-  const current = state.import;
-  if (current.phase === "importing") {
-    return (
-      <p className="meta" role="status">
-        Loading records
-      </p>
-    );
-  }
-  if (current.phase === "error") {
-    return (
-      <div className={styles.error} role="alert">
-        <p>{current.message}</p>
-        {current.details.length > 0 && (
-          <ul>
-            {current.details.map((detail) => (
-              <li key={detail}>{detail}</li>
-            ))}
-          </ul>
-        )}
-      </div>
-    );
-  }
-  if (current.phase === "success") {
-    const { imported, range, warnings } = current.result;
-    return (
-      <div className="meta" role="status">
-        <p>
-          Loaded {count(imported, "record")} · {rangeLabel(range.from, range.to, timezone)}
-        </p>
-        {warnings.map((warning) => (
-          <p key={warning}>{warning}</p>
-        ))}
-      </div>
-    );
-  }
-  return null;
 }

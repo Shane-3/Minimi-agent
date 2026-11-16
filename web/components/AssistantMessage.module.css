@@ -131,3 +131,21 @@
 .error {
   color: var(--danger);
 }
+
+.copy {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.copy:hover {
+  background: var(--surface);
+  color: var(--text);
+}

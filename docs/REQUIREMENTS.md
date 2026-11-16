@@ -41,7 +41,7 @@ Judged on: answers fast, gets things right, good to talk to. Order of priority w
 - F14. Every web claim has a source link and a date. Conflicting sources are both shown; official pages are preferred.
 
 ### Verification
-- F15. A code check confirms each number, date and name in the answer appears in a loaded record or a retrieved source, and marks it verified or unverified.
+- F15. A code check confirms each figure, date, quote (with its speaker or site), sum and day count in the answer against the loaded records, the conversation and retrieved sources, and marks anything it cannot confirm as unverified.
 - F16. Derived numbers show their arithmetic.
 
 ## 4. UI and UX

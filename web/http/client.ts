@@ -1,4 +1,5 @@
 // Fetch wrappers for the API and the reader for the chat stream.
+import type { ExtraSampleId } from "../../shared/samples.ts";
 // Responses come from this app's own server, whose routes are typed with the
 // same shared types, so they are read with a type assertion, not re-validated.
 import type {
@@ -78,6 +79,9 @@ export const api = {
   /** `content` is the file's raw text; every check on it runs on the server. */
   importFile: (content: string, timezone: string) => json<ImportResult>("/import", jsonBody({ content, timezone })),
   importSample: (timezone: string) => json<ImportResult>("/import/sample", jsonBody({ timezone })),
+  /** One of the larger samples in samples/, imported as it is. */
+  importNamedSample: (name: ExtraSampleId, timezone: string) =>
+    json<ImportResult>(`/import/sample/${encodeURIComponent(name)}`, jsonBody({ timezone })),
   thread: (id: string) => json<ThreadMessage[]>(`/threads/${encodeURIComponent(id)}`),
 };
 

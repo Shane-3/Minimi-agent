@@ -7,7 +7,16 @@ import { matchesFilter } from "./RecordsPanel.tsx";
 
 const render = (importState: ImportState) =>
   renderToStaticMarkup(
-    <ImportDialog open importState={importState} timezone="Asia/Kolkata" onUpload={() => {}} onDrag={() => {}} onClose={() => {}} />,
+    <ImportDialog
+      open
+      importState={importState}
+      timezone="Asia/Kolkata"
+      onUpload={() => {}}
+      onDrag={() => {}}
+      onLoadSample={() => {}}
+      onLoadNamedSample={() => {}}
+      onClose={() => {}}
+    />,
   );
 
 describe("ImportDialog", () => {
@@ -19,6 +28,11 @@ describe("ImportDialog", () => {
     for (const field of ["type", "timestamp", "turns", "content", "title", "participants"]) expect(html).toContain(`<code>${field}</code>`);
     expect(html).toContain("Download this example");
     expect(html).toContain("read in your timezone (Asia/Kolkata)");
+  });
+
+  it("offers the ready-made samples", () => {
+    const html = render({ phase: "idle" });
+    for (const title of ["Acme and team (small)", "Kestrel Works", "Monsoon Bikes"]) expect(html).toContain(title);
   });
 
   it("shows the result of the upload, with its warnings", () => {

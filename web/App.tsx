@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { IMPORT_MAX_BYTES } from "../shared/limits.ts";
+import type { ExtraSampleId } from "../shared/samples.ts";
 import type { Health, ImportResult, MemoryChip } from "../shared/types.ts";
 import { ApiFailure, api, streamChat } from "./http/client.ts";
 import styles from "./App.module.css";
@@ -189,6 +190,7 @@ export function App() {
   };
 
   const loadSample = () => runImport(() => api.importSample(timezone));
+  const loadNamedSample = (name: ExtraSampleId) => runImport(() => api.importNamedSample(name, timezone));
 
   const upload = (file: File) => {
     // Checked here too, so a huge file fails at once instead of after uploading.
@@ -339,6 +341,8 @@ export function App() {
         timezone={timezone}
         onUpload={upload}
         onDrag={(over) => dispatchRecords({ type: "drag", over })}
+        onLoadSample={() => void loadSample()}
+        onLoadNamedSample={(name) => void loadNamedSample(name)}
         onClose={() => setImportOpen(false)}
       />
     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type DragEvent } from "react";
 import { IMPORT_MAX_BYTES } from "../../shared/limits.ts";
+import { EXTRA_SAMPLES, type ExtraSampleId } from "../../shared/samples.ts";
 import { count, rangeLabel } from "../format.ts";
 import { EXAMPLE_FILE_NAME, EXAMPLE_JSON } from "../importExample.ts";
 import type { ImportState } from "../state/records.ts";
@@ -11,6 +12,9 @@ interface ImportDialogProps {
   timezone: string;
   onUpload: (file: File) => void;
   onDrag: (over: boolean) => void;
+  /** The small bundled sample, dated to recent days. */
+  onLoadSample: () => void;
+  onLoadNamedSample: (name: ExtraSampleId) => void;
   onClose: () => void;
 }
 
@@ -24,7 +28,7 @@ const FIELDS: [string, string, string][] = [
 ];
 
 /** How to shape a file, a ready-made example, and the upload itself (with its result). */
-export function ImportDialog({ open, importState, timezone, onUpload, onDrag, onClose }: ImportDialogProps) {
+export function ImportDialog({ open, importState, timezone, onUpload, onDrag, onLoadSample, onLoadNamedSample, onClose }: ImportDialogProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const importing = importState.phase === "importing";
@@ -102,6 +106,25 @@ export function ImportDialog({ open, importState, timezone, onUpload, onDrag, on
           </div>
 
           <ImportResult importState={importState} timezone={timezone} />
+
+          <h3 className={styles.subheading}>Or load a ready-made sample</h3>
+          <p className="meta">All made up. Load more than one to see how answers keep them apart.</p>
+          <ul className={styles.samples}>
+            <li>
+              <button type="button" className={styles.sample} onClick={onLoadSample} disabled={importing}>
+                <span className={styles.sampleTitle}>Acme and team (small)</span>
+                <span className="meta">6 records from the last two weeks: client calls, a CRM shortlist, interviews, a past chat.</span>
+              </button>
+            </li>
+            {EXTRA_SAMPLES.map((sample) => (
+              <li key={sample.id}>
+                <button type="button" className={styles.sample} onClick={() => onLoadNamedSample(sample.id)} disabled={importing}>
+                  <span className={styles.sampleTitle}>{sample.title}</span>
+                  <span className="meta">{sample.about}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
 
           <h3 className={styles.subheading}>Example</h3>
           <pre className={styles.example} tabIndex={0} aria-label="Example file">

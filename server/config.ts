@@ -136,3 +136,6 @@ export const DATABASE_PATH = fileURLToPath(new URL("../data/minimi.db", import.m
 
 /** The bundled sample history, anchored to weekdays. */
 export const SAMPLE_PATH = fileURLToPath(new URL("../data/sample.json", import.meta.url));
+
+/** The larger samples, imported as they are (shared/samples.ts lists them). */
+export const SAMPLES_DIR = fileURLToPath(new URL("../samples/", import.meta.url));

@@ -1,8 +1,11 @@
 // Import and records routes (ARCHITECTURE.md §8).
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { Router, type Response } from "express";
 import { z } from "zod";
+import { EXTRA_SAMPLE_IDS } from "../../shared/samples.ts";
 import type { RecordSummary } from "../../shared/types.ts";
+import { SAMPLES_DIR } from "../config.ts";
 import { parseBody, sendError } from "../http.ts";
 import {
   ImportError,
@@ -19,6 +22,8 @@ export interface ImportRouteOptions {
   samplePath: string;
   /** Injected so tests can load the sample on a chosen day. */
   now?: () => Date;
+  /** Where the larger samples are; tests point it elsewhere. */
+  samplesDir?: string;
 }
 
 // The browser sends the file's raw text, so every file check (JSON syntax
@@ -33,7 +38,9 @@ const sampleBody = z.object({
   timezone: z.string().min(1),
 });
 
-export function importRoutes({ store, samplePath, now = () => new Date() }: ImportRouteOptions): Router {
+const sampleName = z.enum(EXTRA_SAMPLE_IDS);
+
+export function importRoutes({ store, samplePath, now = () => new Date(), samplesDir = SAMPLES_DIR }: ImportRouteOptions): Router {
   const router = Router();
 
   router.post("/import", (req, res) => {
@@ -54,6 +61,24 @@ export function importRoutes({ store, samplePath, now = () => new Date() }: Impo
       const sample = JSON.parse(await readFile(samplePath, "utf8")) as unknown;
       const prepared = prepareSample(sample, body.timezone, now());
       res.json(loadSampleInto(store, prepared, body.timezone));
+    } catch (error) {
+      sendImportFailure(res, error);
+    }
+  });
+
+  // One of the larger samples, imported like a user's file: fixed dates,
+  // and loading it again skips what is already there.
+  router.post("/import/sample/:name", async (req, res) => {
+    const name = sampleName.safeParse(req.params.name);
+    if (!name.success) {
+      sendError(res, 404, "not_found", "That sample doesn't exist.");
+      return;
+    }
+    const body = parseBody(sampleBody, req.body, res);
+    if (body === null) return;
+    try {
+      const text = await readFile(join(samplesDir, `${name.data}.json`), "utf8");
+      res.json(importInto(store, prepareImport(parseImportText(text), body.timezone), body.timezone));
     } catch (error) {
       sendImportFailure(res, error);
     }

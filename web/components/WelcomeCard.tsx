@@ -62,6 +62,9 @@ export function WelcomeCard({ records, importState, timezone, onLoadSample, onUp
           <button type="button" className="button" onClick={onOpenImport} disabled={importing}>
             Upload JSON
           </button>
+          <button type="button" className="link-button" onClick={onOpenImport} disabled={importing}>
+            More samples
+          </button>
           <button type="button" className="link-button" onClick={onStartWithout} disabled={importing}>
             Start without history
           </button>

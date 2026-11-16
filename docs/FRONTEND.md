@@ -103,6 +103,7 @@ Orange text on white is used at 13px medium or larger only for interactive items
 - Opened by "Upload JSON" in the header, on the welcome card and in the records panel.
 - Shows how to shape a file: a short example (the same one offered as "Download this example", and imported by a test so it always works), each field with whether it is required, and notes on timezones, duplicates, chat exports and all-or-nothing imports.
 - "Choose JSON file", or drop a file on it. The result (summary and warnings) or the error (record and field to fix) shows in the dialog.
+- "Or load a ready-made sample": the small sample, and the larger Kestrel Works and Monsoon Bikes files in `samples/`. All fictional. The welcome card links here as "More samples".
 
 ### Records panel
 - List grouped by date, newest first: type label (Meeting, Chat, Note), title, time.

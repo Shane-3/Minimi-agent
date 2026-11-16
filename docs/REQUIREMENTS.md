@@ -18,7 +18,7 @@ Judged on: answers fast, gets things right, good to talk to. Order of priority w
 ## 3. Functional requirements
 
 ### Memory
-- F1. Import records from JSON (format in ARCHITECTURE.md §3). Meetings, notes and chat exports. Common field names from other tools (date, messages, from, body, Unix times, kinds like "email") are read too, so exported history loads as it is.
+- F1. Import records from JSON (format in ARCHITECTURE.md §3). Meetings, notes and chat exports. Common field names from other tools (date, messages, from, body, Unix times, kinds like "email") are read too, so exported history loads as it is. Any other kind of dated record (an article, a task, a journal entry) is kept as a note, with its fields as its text. The one required field is the date.
 - F2. One-click sample history, with dates relative to today, plus two larger fictional samples.
 - F3. Every live question and answer is stored with a timestamp and is recallable later, across threads.
 - F4. Date phrases resolve in code, in the user's timezone: weekday names, "last Tuesday", "yesterday", "3 November", "two weeks ago".

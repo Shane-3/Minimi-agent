@@ -19,10 +19,10 @@ interface ImportDialogProps {
 }
 
 const FIELDS: [string, string, string][] = [
-  ["type", "required", '"meeting", "chat" or "note". Use "chat" for WhatsApp groups and email threads.'],
-  ["timestamp", "required", "When it happened, in ISO 8601 with its offset, e.g. 2026-11-09T10:00:00+05:30."],
-  ["turns", "one of these two", "Who said what: a list of { speaker, text }, each with an optional timestamp."],
-  ["content", "one of these two", 'Plain text instead of turns. Lines like "Asha: ..." become turns; other text is split into paragraphs.'],
+  ["timestamp", "required", "When it happened, in ISO 8601 with its offset, e.g. 2026-11-09T10:00:00+05:30. The one field every record needs."],
+  ["turns", "optional", "Who said what: a list of { speaker, text }, each with an optional timestamp."],
+  ["content", "optional", 'Plain text instead of turns. Lines like "Asha: ..." become turns; other text is split into paragraphs.'],
+  ["type", "optional", '"meeting", "chat" or "note". Any other kind ("article", "task", "bookmark") is kept as a note titled with it.'],
   ["title", "optional", "Shown in Records and on answers. Made from the first words when missing."],
   ["participants", "optional", "A list of names."],
 ];
@@ -83,8 +83,8 @@ export function ImportDialog({ open, importState, timezone, onUpload, onDrag, on
 
         <div className={styles.body}>
           <p className={styles.lede}>
-            A JSON file with a list of records: meetings, chats (WhatsApp, email, Slack) or notes. Each record needs a type, a
-            timestamp, and either turns or content.
+            A JSON file with a list of dated records: meetings, chats (WhatsApp, email, Slack), notes, or anything else you keep,
+            such as articles, tasks or journal entries. Each record needs a date; everything else is read as it comes.
           </p>
 
           <div
@@ -152,7 +152,8 @@ export function ImportDialog({ open, importState, timezone, onUpload, onDrag, on
             <li>
               Files exported from other tools usually load as they are: names like <code>date</code> or <code>created_at</code>,{" "}
               <code>messages</code>, <code>from</code> and <code>body</code> are understood, so are Unix times and kinds like
-              "email", "WhatsApp" or "call". A record without a type is read as a chat if it has turns, a note if it is one text.
+              "email", "WhatsApp" or "call". A record with neither turns nor content keeps its other fields as its text, one line
+              each, so nothing in the file is lost.
             </li>
             <li>A record already loaded is skipped, so uploading the same file twice is safe.</li>
             <li>

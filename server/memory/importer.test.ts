@@ -170,7 +170,9 @@ describe("prepareImport: invalid files", () => {
   });
 
   it("rejects JSON that is not a list of records", () => {
-    for (const value of [42, "text", { meetings: [] }, { records: "none" }]) {
+    // An object with a list under any name is read as that list, so an object
+    // with no list and no date is the shape that cannot be read.
+    for (const value of [42, "text", { title: "Not a record" }, { records: "none" }]) {
       expect(importError(value).code).toBe("wrong_shape");
     }
   });
@@ -187,7 +189,8 @@ describe("prepareImport: invalid files", () => {
   });
 
   it("names an invalid type", () => {
-    expect(importError([meeting({ type: "spreadsheet" })]).message).toBe(
+    // Any text is a kind (unknown ones become notes), so an invalid type is one that is not text.
+    expect(importError([meeting({ type: 42 })]).message).toBe(
       'Record 1 ("Acme renewal call"): type must be "meeting", "chat" or "note".',
     );
   });
@@ -229,7 +232,7 @@ describe("prepareImport: invalid files", () => {
     const error = importError([
       meeting({ timestamp: undefined }),
       meeting({ title: "Fine" }),
-      meeting({ title: "Third", type: "spreadsheet" }),
+      meeting({ title: "Third", type: 42 }),
     ]);
     expect(error.details).toEqual([
       'Record 1 ("Acme renewal call") is missing a timestamp.',
@@ -323,7 +326,7 @@ describe("importInto", () => {
   });
 
   it("stores nothing when any record is invalid", () => {
-    expect(() => importInto(store, prepareImport([meeting(), meeting({ type: "spreadsheet" })], KOLKATA), KOLKATA)).toThrow(
+    expect(() => importInto(store, prepareImport([meeting(), meeting({ type: 42 })], KOLKATA), KOLKATA)).toThrow(
       ImportError,
     );
     expect(store.listRecords()).toEqual([]);

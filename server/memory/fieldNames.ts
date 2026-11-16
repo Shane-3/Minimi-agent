@@ -96,13 +96,67 @@ function normaliseRecord(item: Json): Json {
     }
   }
   if (record.turns === undefined) rename(record, "content", ["transcript", "text", "body", "notes"]);
+
+  // Anything else with a date (an article, a task, a bookmark): each of its
+  // other fields becomes a line of the record, so nothing in the file is
+  // lost. As separate turns, so "summary: ..." is not read as a speaker.
+  let fromFields = false;
+  // Without a title, the first field's value names the record ("Draft the pricing page copy").
+  let fieldTitle = "";
+  if (record.turns === undefined && record.content === undefined) {
+    const fields = Object.entries(record)
+      .filter(([key]) => !RECORD_FIELDS.has(key))
+      .flatMap(([key, value]) => {
+        const text = textOf(value);
+        return text === "" ? [] : [{ key, text }];
+      });
+    if (fields.length > 0) {
+      // One field needs no label; several keep theirs ("due: 2026-11-14").
+      record.turns = fields.map(({ key, text }) => ({ text: fields.length === 1 ? text : `${key}: ${text}` }));
+      fieldTitle = shorten(fields[0]!.text);
+      fromFields = true;
+    }
+  }
   if (Array.isArray(record.turns)) record.turns = record.turns.map(normaliseTurn);
 
-  // A known kind under another name ("email", "call") becomes one of the three.
-  if (typeof record.type === "string") record.type = TYPE_NAMES[record.type.trim().toLowerCase()] ?? record.type;
-  // No kind at all: a conversation if it has turns, a note if it is one text.
-  if (record.type === undefined) record.type = record.turns !== undefined ? "chat" : record.content !== undefined ? "note" : undefined;
+  if (typeof record.type === "string") {
+    const known = TYPE_NAMES[record.type.trim().toLowerCase()];
+    if (known !== undefined) {
+      // A known kind under another name ("email", "call") becomes one of the three.
+      record.type = known;
+    } else if (record.type.trim() !== "") {
+      // Any other kind is kept as a note, with the kind in its title, so
+      // "which articles did I read?" still finds it.
+      const kind = record.type.trim().charAt(0).toUpperCase() + record.type.trim().slice(1);
+      const title = typeof record.title === "string" && record.title.trim() !== "" ? record.title.trim() : fieldTitle;
+      record.title = title === "" ? kind : `${kind}: ${title}`;
+      record.type = "note";
+    }
+  }
+  if (record.title === undefined && fieldTitle !== "") record.title = fieldTitle;
+  // No kind at all: a conversation if it has turns of its own, otherwise a note.
+  if (record.type === undefined) {
+    record.type = record.turns !== undefined && !fromFields ? "chat" : record.content !== undefined || fromFields ? "note" : undefined;
+  }
   return record;
+}
+
+/** Fields the importer reads itself; the rest of a record can become its text. */
+const RECORD_FIELDS = new Set(["timestamp", "type", "title", "participants", "id", "turns", "content"]);
+
+/** The first words of a text, for a title. */
+function shorten(text: string): string {
+  const words = text.split(/\s+/);
+  return words.length <= 8 ? text : `${words.slice(0, 8).join(" ")}...`;
+}
+
+/** A field's value as one line of text. */
+function textOf(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value) && value.every((item) => ["string", "number", "boolean"].includes(typeof item))) return value.join(", ");
+  if (value === null || value === undefined) return "";
+  return JSON.stringify(value);
 }
 
 /**
@@ -113,8 +167,13 @@ export function normaliseFieldNames(value: unknown): unknown {
   let items: unknown = value;
   if (isObject(value)) {
     const list = first(value, LIST_KEYS);
-    if (list === undefined || !Array.isArray(list[1])) return value;
-    items = list[1];
+    const arrays = Object.values(value).filter(Array.isArray);
+    if (list !== undefined && Array.isArray(list[1])) items = list[1];
+    // An object holding a single list under another name ("journal", "reading").
+    else if (arrays.length === 1) items = arrays[0];
+    // A single record on its own.
+    else if (first(value, TIMESTAMP) !== undefined) items = [value];
+    else return value;
   }
   if (!Array.isArray(items)) return value;
   const list = items.map((item) => {

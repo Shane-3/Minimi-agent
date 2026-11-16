@@ -83,6 +83,11 @@ export interface Evidence {
   snippet: string;
   /** True when the page is on the entity's own site. */
   official: boolean;
+  /**
+   * True when `snippet` is the page's own text, read just now, rather than a
+   * search engine's excerpt: the strongest source for a current value.
+   */
+  readNow?: boolean;
 }
 
 // ---------------------------------------------------------------------------

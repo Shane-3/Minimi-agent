@@ -3,6 +3,7 @@ import {
   cleanText,
   createWebSearch,
   isOfficial,
+  pagesToRead,
   pageKey,
   planSearches,
   toDay,
@@ -34,17 +35,44 @@ interface SentBody {
   include_published_date: boolean;
   search_depth: string;
   start_date?: string;
+  include_domains?: string[];
 }
 
-function fakeTavily(script: { [key: string]: Scripted }) {
+interface SentExtract {
+  urls: string[];
+  query: string;
+  chunks_per_source: number;
+  extract_depth: string;
+  authorization: string | null;
+}
+
+/** A page's text for the extract endpoint, or how reading it goes wrong. */
+type PageScript = string | { status: number } | { hang: true };
+
+function fakeTavily(script: { [key: string]: Scripted }, pages: { [url: string]: PageScript } = {}) {
   const sent: { body: SentBody; authorization: string | null }[] = [];
+  const extracts: SentExtract[] = [];
   let inFlight = 0;
   let maxInFlight = 0;
 
-  const fetch = (async (_url: string, init: RequestInit) => {
+  const fetch = (async (url: string, init: RequestInit) => {
+    if (String(url).endsWith("/extract")) {
+      const request = JSON.parse(String(init.body)) as Omit<SentExtract, "authorization">;
+      extracts.push({ ...request, authorization: new Headers(init.headers).get("authorization") });
+      const scripted = request.urls.map((page) => pages[page]);
+      const failing = scripted.find((page) => typeof page === "object" && "status" in page) as { status: number } | undefined;
+      if (failing !== undefined) return new Response("{}", { status: failing.status });
+      if (scripted.some((page) => typeof page === "object" && "hang" in page)) {
+        await new Promise((_, reject) => init.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))));
+      }
+      const results = request.urls.flatMap((page) => (typeof pages[page] === "string" ? [{ url: page, raw_content: pages[page] }] : []));
+      return new Response(JSON.stringify({ results, failed_results: [] }));
+    }
     const body = JSON.parse(String(init.body)) as SentBody;
     sent.push({ body, authorization: new Headers(init.headers).get("authorization") });
-    const reply = script[`${body.topic}:${body.query}`] ?? { results: [] };
+    // A search on one site is scripted as "site:<domain>:<query>".
+    const key = body.include_domains === undefined ? `${body.topic}:${body.query}` : `site:${body.include_domains.join(",")}:${body.query}`;
+    const reply = script[key] ?? { results: [] };
     inFlight += 1;
     maxInFlight = Math.max(maxInFlight, inFlight);
     try {
@@ -65,14 +93,14 @@ function fakeTavily(script: { [key: string]: Scripted }) {
     }
   }) as typeof globalThis.fetch;
 
-  return { fetch, sent, maxInFlight: () => maxInFlight };
+  return { fetch, sent, extracts, maxInFlight: () => maxInFlight };
 }
 
 const NOW = new Date("2026-11-13T06:00:00Z");
 
-function searchWith(script: { [key: string]: Scripted }, timeoutMs = 8_000) {
-  const tavily = fakeTavily(script);
-  const tool = createWebSearch({ apiKey: "tvly-test", fetch: tavily.fetch, now: () => NOW, timeoutMs });
+function searchWith(script: { [key: string]: Scripted }, timeoutMs = 8_000, pages: { [url: string]: PageScript } = {}) {
+  const tavily = fakeTavily(script, pages);
+  const tool = createWebSearch({ apiKey: "tvly-test", fetch: tavily.fetch, now: () => NOW, timeoutMs, extractTimeoutMs: 50 });
   return { tool, tavily };
 }
 
@@ -171,7 +199,9 @@ describe("createWebSearch: requests", () => {
   it("sends each search to Tavily with the key, asking for dated results", async () => {
     const { tool, tavily } = searchWith({});
     await tool.search(hubspot);
-    expect(tavily.sent.map((request) => request.authorization)).toEqual(["Bearer tvly-test", "Bearer tvly-test"]);
+    // The page search and the news search, then (no pricing page found) one search on hubspot.com alone.
+    expect(tavily.sent.map((request) => request.authorization)).toEqual(["Bearer tvly-test", "Bearer tvly-test", "Bearer tvly-test"]);
+    expect(tavily.sent[2]?.body).toMatchObject({ query: "HubSpot CRM pricing", include_domains: ["hubspot.com"] });
     expect(tavily.sent[0]?.body).toEqual({
       query: "HubSpot CRM pricing",
       topic: "general",
@@ -394,5 +424,111 @@ describe("helpers", () => {
 
   it("keeps short text as it is", () => {
     expect(cleanText("  Starter plan:\n  see the table below  ")).toBe("Starter plan: see the table below");
+  });
+});
+
+describe("reading the entity's own pages", () => {
+  const page = (url: string, official = true) => ({ title: "Page", url, site: new URL(url).hostname, publishedDate: null, snippet: "", official });
+
+  it("picks the pricing page for a price question, the changelog for what shipped, and both when asked both", () => {
+    const evidence = [
+      page("https://review.example.org/hubspot-pricing", false),
+      page("https://www.hubspot.com/products/crm/starter"),
+      page("https://www.hubspot.com/pricing/crm"),
+      page("https://www.hubspot.com/company-news/fall-release"),
+    ];
+    const entity = (queries: string[]) => ({ name: "HubSpot", queries, officialSite: "hubspot.com" });
+    expect(pagesToRead(entity(["HubSpot CRM pricing per seat"]), evidence)).toEqual({ urls: ["https://www.hubspot.com/pricing/crm"], missing: [] });
+    expect(pagesToRead(entity(["HubSpot new features shipped"]), evidence).urls).toEqual(["https://www.hubspot.com/company-news/fall-release"]);
+    expect(pagesToRead(entity(["HubSpot pricing", "HubSpot product launches"]), evidence).urls).toEqual([
+      "https://www.hubspot.com/pricing/crm",
+      "https://www.hubspot.com/company-news/fall-release",
+    ]);
+  });
+
+  it("does not take a vendor's blog post for its release notes", () => {
+    const blog = [page("https://www.pipedrive.com/en/blog/best-crm-software"), page("https://www.pipedrive.com/en/newsletter")];
+    expect(pagesToRead({ name: "Pipedrive", queries: ["Pipedrive new features shipped"] }, blog)).toEqual({ urls: [], missing: ["releases"] });
+  });
+
+  it("names what it found no page for, and never picks a third-party page", () => {
+    const thirdParty = [page("https://review.example.org/hubspot-pricing", false)];
+    expect(pagesToRead({ name: "HubSpot", queries: ["HubSpot pricing"], officialSite: "hubspot.com" }, thirdParty)).toEqual({
+      urls: [],
+      missing: ["price"],
+    });
+  });
+
+  it("searches the vendor's own site for a pricing page the results did not have, and reads it", async () => {
+    const { tool, tavily } = searchWith(
+      {
+        "general:HubSpot CRM pricing": { results: [{ title: "Review", url: "https://review.example.org/hubspot", content: "About $20.", score: 0.9 }] },
+        "site:hubspot.com:HubSpot CRM pricing": { results: [{ title: "Pricing", url: "https://www.hubspot.com/pricing/crm", content: "Plans.", score: 0.8 }] },
+      },
+      8_000,
+      { "https://www.hubspot.com/pricing/crm": "Starter: $20 per seat per month." },
+    );
+    const result = await tool.search(hubspot);
+    expect(tavily.sent.map((request) => request.body.include_domains)).toContainEqual(["hubspot.com"]);
+    expect(tavily.extracts[0]?.urls).toEqual(["https://www.hubspot.com/pricing/crm"]);
+    expect(result.entities[0]!.evidence[0]).toMatchObject({
+      url: "https://www.hubspot.com/pricing/crm",
+      site: "hubspot.com",
+      readNow: true,
+      snippet: "Starter: $20 per seat per month.",
+    });
+  });
+
+  const script = {
+    "general:HubSpot CRM pricing": {
+      results: [
+        { title: "Review", url: "https://review.example.org/hubspot", content: "Starter is about $20.", score: 0.9 },
+        { title: "HubSpot pricing", url: "https://www.hubspot.com/pricing", content: "Short search snippet.", score: 0.5 },
+      ],
+    },
+  };
+  const pricingText = `Starter Customer Platform: $20 per seat per month, billed monthly. ${"Plan details. ".repeat(60)}`;
+
+  it("reads the official page and puts its own text first, ahead of the search snippets", async () => {
+    const { tool, tavily } = searchWith(script, 8_000, { "https://www.hubspot.com/pricing": pricingText });
+    const result = await tool.search(hubspot);
+    expect(tavily.extracts).toEqual([
+      expect.objectContaining({
+        urls: ["https://www.hubspot.com/pricing"],
+        query: "HubSpot CRM pricing",
+        chunks_per_source: 3,
+        extract_depth: "advanced",
+        authorization: "Bearer tvly-test",
+      }),
+    ]);
+    const [first, ...rest] = result.entities[0]!.evidence;
+    expect(first).toMatchObject({ url: "https://www.hubspot.com/pricing", title: "HubSpot pricing", official: true, readNow: true });
+    // Longer than a search snippet, cut at the page limit.
+    expect(first!.snippet.startsWith("Starter Customer Platform: $20 per seat per month")).toBe(true);
+    expect(first!.snippet.length).toBeGreaterThan(500);
+    expect(first!.snippet.length).toBeLessThanOrEqual(2_401);
+    // The same page is not listed twice.
+    expect(rest.map((evidence) => evidence.url)).toEqual(["https://review.example.org/hubspot"]);
+  });
+
+  it("keeps the search results as they are when the page cannot be read or takes too long", async () => {
+    for (const failure of [{ status: 500 }, { hang: true as const }]) {
+      const { tool } = searchWith(script, 8_000, { "https://www.hubspot.com/pricing": failure });
+      const result = await tool.search(hubspot);
+      expect(result.entities[0]).toMatchObject({ status: "found" });
+      expect(result.entities[0]!.evidence.map((evidence) => [evidence.url, evidence.readNow])).toEqual([
+        ["https://www.hubspot.com/pricing", undefined],
+        ["https://review.example.org/hubspot", undefined],
+      ]);
+    }
+  });
+
+  it("reads nothing when every search failed, since a read would fail the same way", async () => {
+    const { tool, tavily } = searchWith({
+      "general:HubSpot CRM pricing": { status: 401 },
+      "news:HubSpot CRM pricing": { status: 401 },
+    });
+    await tool.search(hubspot);
+    expect(tavily.extracts).toEqual([]);
   });
 });

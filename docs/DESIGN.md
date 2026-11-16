@@ -7,7 +7,7 @@ A chat agent with one tool, `web_search`, and a dated memory of everything it is
 Every question runs the same path, with the model in the middle and code on both sides.
 
 1. **Code finds the memory.** Date phrases ("last Tuesday", "3 November") become exact days in the user's timezone. Records on those days and keyword matches (SQLite FTS5) go into the prompt whole, with an index of everything stored. Follow-ups carry the chat's recent records; spare budget goes to the same chat group or meeting series, then recent records.
-2. **One model, one tool.** History is answered only from the records, quoting the deciding line. Anything that can change (prices, versions, news) goes to `web_search`, which fans out one query set per entity to Tavily in parallel and returns dated evidence with official pages marked. Everything else is answered like a normal assistant.
+2. **One model, one tool.** History is answered only from the records, quoting the deciding line. Anything that can change (prices, versions, news) goes to `web_search`, which fans out one query set per entity to Tavily in parallel, then reads each vendor's own pricing or changelog page. Everything else is answered like a normal assistant.
 3. **Code checks the answer.** After streaming, every figure, date, quote, sum and day count is checked against the records and sources; anything unsupported is underlined with a reason. The check never blocks the answer.
 4. **The exchange is saved** with a timestamp, so "What did I ask you on 3 November?" is ordinary recall.
 
@@ -19,8 +19,9 @@ Every question runs the same path, with the model in the middle and code on both
 - **Dates in code.** Models get weekdays wrong, so the resolver decides what "last Tuesday" means, and the prompt and imported records carry finished labels ("Mon 9 Nov"). The model has no weekday to work out.
 - **Raw records are the only evidence.** Nothing model-written is stored as a fact; the check confirms each quote is really there, from that speaker.
 - **Verification is deterministic.** An LLM judging an LLM shares its blind spots and doubles latency. Plain code can tell that "$15/user/mo" and "15 USD per seat" agree, that 14 Nov 2026 is not a Monday, and that 12 × $14 is $168.
+- **Primary sources, read in code.** Search snippets are mostly third-party roundups, so the tool also reads each vendor's own pricing or changelog page. Still one tool, one key.
 - **Honest wording.** A pricing page shows today's price, not last week's, so without a stored old value or a dated announcement the agent says "no announced change found".
-- **Fast without cutting corners.** Cerebras won on measured latency: history answers start in about a second with one call and no search; re-checks take one parallel search step (7 to 12 s). Reasoning is higher once results are in, where mistakes cost most.
+- **Fast without cutting corners.** Cerebras won on measured latency: history answers start in about a second with one call and no search; re-checks take one parallel search-and-read step (about 9 to 12 s). Reasoning is higher once results are in, where mistakes cost most.
 - **Real histories are messy.** The importer reads other tools' field names (`date`, `messages`, `from`, Unix times) and any dated record (articles, tasks, journals), and rejects a bad file whole, naming the record and field.
 
 ## Considered and rejected
@@ -45,6 +46,6 @@ Every question runs the same path, with the model in the middle and code on both
 ## With another week
 
 - **Hybrid retrieval:** embeddings beside keywords, for questions that share no words with their record, the one gap the large histories showed.
-- **Primary sources first:** fetch vendors' own pricing and changelog pages when search returns only third-party summaries.
+- **Pages that need a browser:** some pricing pages render prices with JavaScript or vary by country; a rendering step, with the user's region, would close that gap.
 - **Watch, don't wait:** "tell me if any of these change", with scheduled re-checks of stored claims.
 - **Memory over MCP,** so any assistant can use the same verified memory; a larger eval set from real, anonymised histories.

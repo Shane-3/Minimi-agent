@@ -26,7 +26,7 @@ Browser (React)                       Express server                          Ex
 | History store | SQLite | Raw records and segments are the source of truth; FTS5 index for keyword lookup |
 | Retrieval | Code | Resolve dates, choose the records for this question (and its follow-ups), fit them to a token budget |
 | Agent loop | **The only agent** | One model at a time, from a pool, with one tool. Decides whether to search, then answers |
-| `web_search` tool | Code | Fan out queries per entity, call Tavily in parallel, dedupe, rank, date and mark official pages |
+| `web_search` tool | Code | Fan out queries per entity, call Tavily in parallel, dedupe, rank, date and mark official pages; then read each entity's own pricing or changelog page |
 | Grounding check | Code | Every figure, date, quote, sum and day count in the answer is checked against the records and sources |
 
 There is exactly one agent and one place that calls a model (`server/agent/loop.ts`). Memory is not a tool: code fetches history before the model runs, so the model cannot forget to look and the one-tool rule holds.
@@ -96,7 +96,7 @@ A live conversation is a record of type `chat`; each message is a segment. Impor
 2. **Resolve dates.** `chrono-node` finds date phrases; code turns each into a range of days in the user's timezone. "Monday" is the most recent Monday (the one before it is kept as an alternative), "last Tuesday" the previous week's, "3 November" the most recent one, "two weeks ago" a whole week. For a date with no records, code also finds the nearest days with records either side.
 3. **Find records.** If everything stored fits the budget, all of it is loaded, so a paraphrase cannot miss. Otherwise candidates are ranked: records on the asked date, then FTS5 matches for the message's keywords. A follow-up ("why?", "anyone else?") also carries the records the chat's last three answers drew on, the keywords of its last three questions, and the people those answers named. The budget left is then filled with the rest of the same chat groups and meeting series, then the most recent records, for words the question shares with no record ("batteries" against "the last 150 packs are in").
 4. **Load context.** Records go into the prompt whole, up to about 20,000 tokens, oldest first, with an index of every record. A record longer than the budget is loaded as its matching segments plus neighbours and marked `partial`. Earlier turns of the chat are replayed up to 8,000 tokens; older ones are left out and the chat itself becomes searchable as a record.
-5. **Run the agent.** The model answers directly, or calls `web_search`. All searches in one step run in parallel; the loop repeats up to a step cap of 4, and on the last step tools are withheld and the model is told to say what is still unchecked.
+5. **Run the agent.** The model answers directly, or calls `web_search`. The tool searches, then reads each entity's own pages: its pricing page for a price question, its changelog or news for "what shipped", found in the results or by a search on its own site run alongside them, and read with Tavily's extract endpoint for the parts that match the question. These come back marked `readNow` and come first; a page that cannot be read leaves the search results as they were. All searches in one step run in parallel; the loop repeats up to a step cap of 4, and on the last step tools are withheld and the model is told to say what is still unchecked.
 6. **Stream.** Status lines, memory chips, answer text, sources and failed searches go down the SSE stream as they happen.
 7. **Check.** The grounding check runs on the finished answer; its marks follow as one event. If it fails, the answer stands, marked "verification unavailable".
 8. **Save.** Question and answer are stored as segments with timestamps, and the answer's chips, sources and checks in `answer_meta`, so a reload looks the same.
@@ -152,7 +152,7 @@ Unverified items get a dotted underline with the reason; a note under the answer
 ## 8. Speed
 
 - History and general questions make one model call and no search: first text in about 0.5 to 1.5 s on Cerebras.
-- Re-checks: one search step with every entity in parallel, then the answer: about 7 to 12 s.
+- Re-checks: one search step with every entity in parallel (main searches and own-site searches together), then the official pages read in parallel, then the answer: about 9 to 12 s.
 - The rules and memory form a stable prefix of the system message, for the provider's cache.
 - A model pool (`qwen-3.8-27b`, then `gpt-oss-120b`) moves to the next model on a rate limit or overload before any text is shown. A failed or empty call is retried once.
 - Text written before a search ("Let me check…") is held back and dropped, so an answer is never written twice.
@@ -181,7 +181,8 @@ All in `server/config.ts`.
 | Limit | Value |
 |---|---|
 | Model turns per answer | 4 |
-| Search queries per step, timeout each | 10, 8 s |
+| Search queries per step, timeout each | 10 (plus one own-site search per entity), 8 s |
+| Official pages read per entity | 2, about 2,400 characters each, 12 s timeout |
 | Model call timeout, retries | 60 s, 1 |
 | Record budget | about 20,000 tokens (characters ÷ 4), under the free tier's 30,000 a minute |
 | Chat history sent | 8,000 tokens; a follow-up carries the last 3 turns into retrieval |

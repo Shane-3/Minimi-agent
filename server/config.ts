@@ -27,6 +27,26 @@ export const MAX_EVIDENCE_PER_ENTITY = 5;
 
 /** Page text kept per source: enough to hold a price line, short enough to keep the prompt small. */
 export const SNIPPET_MAX_CHARS = 500;
+
+/**
+ * Reading the entity's own pages. Search snippets are often third-party
+ * summaries; the vendor's pricing page or changelog is the primary source,
+ * so after searching, up to this many of its own pages per entity are read
+ * through Tavily's extract endpoint (same key).
+ */
+export const EXTRACT_URL = "https://api.tavily.com/extract";
+export const PAGES_PER_ENTITY = 2;
+/**
+ * "advanced" reads tables and embedded content, which is where pricing
+ * pages keep their prices; it is slower, and accuracy comes first.
+ */
+export const EXTRACT_DEPTH = "advanced";
+/** Tavily's own limit on one extraction, in seconds; our request waits a little longer. */
+export const EXTRACT_TIMEOUT_S = 10;
+export const EXTRACT_TIMEOUT_MS = 12_000;
+/** Relevant chunks of a page (about 800 characters each), and the most text kept from it. */
+export const EXTRACT_CHUNKS = 3;
+export const PAGE_MAX_CHARS = 2_400;
 export const MODEL_TIMEOUT_MS = 60_000;
 export const MODEL_RETRIES = 1;
 /** Wait before the one retry after an overload or server error. */

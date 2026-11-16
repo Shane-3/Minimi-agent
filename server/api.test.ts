@@ -158,13 +158,13 @@ describe("API", () => {
   it("loads a larger sample by name, and skips it all when loaded again", async () => {
     const first = (await (await post("/import/sample/monsoon-bikes", { timezone: KOLKATA })).json()) as ImportResult;
     // The file holds one duplicate, two records with no timezone and one over the budget, on purpose.
-    expect(first).toMatchObject({ imported: 120, skipped: 1 });
+    expect(first).toMatchObject({ imported: 132, skipped: 1 });
     expect(first.warnings).toHaveLength(3);
     const again = (await (await post("/import/sample/monsoon-bikes", { timezone: KOLKATA })).json()) as ImportResult;
-    expect(again).toMatchObject({ imported: 0, skipped: 121 });
+    expect(again).toMatchObject({ imported: 0, skipped: 133 });
 
     const kestrel = (await (await post("/import/sample/kestrel-works", { timezone: KOLKATA })).json()) as ImportResult;
-    expect(kestrel).toMatchObject({ imported: 225, skipped: 0, warnings: [] });
+    expect(kestrel).toMatchObject({ imported: 239, skipped: 0, warnings: [] });
   });
 
   it("answers 404 for a sample name that is not on the list, without reading any file", async () => {

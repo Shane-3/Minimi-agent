@@ -1,5 +1,5 @@
 {
-  "description": "Fictional sample for testing recall at scale: Kestrel Works, a software company, over twenty weeks of meetings, daily standups, WhatsApp groups and email threads. Every company, person and event in it is made up. Load it with Upload JSON.",
+  "description": "Fictional sample for testing recall at scale: Kestrel Works, a software company, over twenty weeks of meetings, daily standups, WhatsApp groups and email threads, plus articles, bookmarks, tasks, journal entries, feedback and an event, written in other tools' shapes (date, created_at as Unix time, from and body, kind). Every company, person and event in it is made up. Load it from Upload JSON.",
   "records": [
     {
       "type": "meeting",
@@ -7111,6 +7111,115 @@
           "text": "Brightline user acceptance testing started. Three bugs, none blocking.",
           "timestamp": "2026-11-13T18:30:00+05:30"
         }
+      ]
+    },
+    {
+      "kind": "article",
+      "date": "2026-09-30T22:00:00+05:30",
+      "title": "Offline-first mobile apps: sync without tears",
+      "url": "https://example.com/offline-first",
+      "note": "Useful for v2.3 offline mode: queue writes locally, retry with backoff, and show the user what is still pending."
+    },
+    {
+      "kind": "article",
+      "date": "2026-10-08T21:15:00+05:30",
+      "title": "Blameless postmortems that actually change things",
+      "url": "https://example.com/blameless-postmortems",
+      "note": "Saved after our staging key incident. Fix the process, not the person, and give every action item an owner and a date."
+    },
+    {
+      "kind": "article",
+      "date": "2026-10-19T20:40:00+05:30",
+      "title": "Moving office without losing a week",
+      "url": "https://example.com/office-move",
+      "note": "Pack on Friday, move on Saturday, test the network before Monday."
+    },
+    {
+      "kind": "bookmark",
+      "date": "2026-10-02T11:00:00+05:30",
+      "title": "Postgres backup and restore guide",
+      "url": "https://example.com/postgres-restore",
+      "tags": [
+        "database",
+        "backups"
+      ]
+    },
+    {
+      "kind": "bookmark",
+      "date": "2026-11-05T16:20:00+05:30",
+      "title": "Coorg homestays for teams",
+      "url": "https://example.com/coorg-stays",
+      "tags": [
+        "offsite"
+      ]
+    },
+    {
+      "kind": "task",
+      "created_at": 1791376200,
+      "task": "Add secret scanning to CI",
+      "owner": "Kabir",
+      "due": "2026-10-16",
+      "status": "done",
+      "completed": "2026-10-23"
+    },
+    {
+      "kind": "task",
+      "created_at": 1793169000,
+      "task": "Send Brightline the driver training plan",
+      "owner": "Meera",
+      "due": "2026-11-20",
+      "status": "open"
+    },
+    {
+      "kind": "task",
+      "created_at": 1793853000,
+      "task": "Book movers for the HSR Layout move",
+      "owner": "Tom",
+      "due": "2026-12-04",
+      "status": "open"
+    },
+    {
+      "type": "journal",
+      "date": "2026-10-16T22:15:00+05:30",
+      "entry": "Offered the support lead role to Anita today. Meera wanted Leo; I think she will come round once Anita is running the European shift."
+    },
+    {
+      "type": "journal",
+      "date": "2026-10-27T23:00:00+05:30",
+      "entry": "Moving Brightline's go-live to 7 December felt like a loss in the room, but it was the right call. Better a week late than a bad first day for 150 drivers."
+    },
+    {
+      "type": "journal",
+      "date": "2026-11-13T22:40:00+05:30",
+      "entry": "Good week. Response times are finally under two hours. Next worry: Brightline driver training on 1 and 2 December."
+    },
+    {
+      "date": "2026-11-11T09:05:00+05:30",
+      "from": "Priya (Brightline)",
+      "subject": "UAT feedback",
+      "body": "The ten drivers in testing like the photo flow. Two asked for bigger buttons on the delivery screen."
+    },
+    {
+      "kind": "feedback",
+      "date": "2026-11-12T14:00:00+05:30",
+      "customer": "Brightline driver (UAT)",
+      "rating": 4,
+      "comment": "Easy to use, but the delivery button is too small with gloves on."
+    },
+    {
+      "kind": "event",
+      "start": "2026-10-30T13:00:00+05:30",
+      "title": "Team lunch for the v2.3 release",
+      "location": "Koramangala",
+      "attendees": [
+        "Shane",
+        "Meera",
+        "Rahul",
+        "Kabir",
+        "Divya",
+        "Arjun",
+        "Nisha",
+        "Tom"
       ]
     }
   ]

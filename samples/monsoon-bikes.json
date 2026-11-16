@@ -1,5 +1,5 @@
 {
-  "description": "Fictional sample for testing: Monsoon Bikes, an e-bike startup, over sixteen weeks of meetings, WhatsApp groups, email threads and founder notes. It also exercises the importer: one duplicate record, two records with no timezone, and one transcript longer than the record budget. Every company, person and event in it is made up. Load it with Upload JSON.",
+  "description": "Fictional sample for testing: Monsoon Bikes, an e-bike startup, over sixteen weeks of meetings, WhatsApp groups, email threads and founder notes, plus articles, tasks, customer feedback, a purchase order and a Slack thread, written in other tools' shapes. It also exercises the importer: one duplicate record, two records with no timezone, and one transcript longer than the record budget. Every company, person and event in it is made up. Load it from Upload JSON.",
   "records": [
     {
       "type": "meeting",
@@ -5795,6 +5795,102 @@
           "text": "Farah's first fortnight: she has already fixed the workshop handover checklist."
         }
       ]
+    },
+    {
+      "kind": "article",
+      "date": "2026-08-21T21:00:00+05:30",
+      "title": "Why battery supply chains slip",
+      "url": "https://example.com/battery-supply",
+      "note": "Read after Voltcell's delay. Cell shortages ripple for months, so keep a second supplier in the pipeline."
+    },
+    {
+      "kind": "article",
+      "date": "2026-09-29T22:10:00+05:30",
+      "title": "Running a product recall customers forgive",
+      "url": "https://example.com/recall-playbook",
+      "note": "Call customers before they find out, fix it free, and report progress every week."
+    },
+    {
+      "kind": "bookmark",
+      "date": "2026-10-13T10:30:00+05:30",
+      "title": "Chakan industrial area map",
+      "url": "https://example.com/chakan-map",
+      "tags": [
+        "warehouse",
+        "move"
+      ]
+    },
+    {
+      "kind": "task",
+      "created_at": 1792035000,
+      "task": "Plan the Chakan workshop layout",
+      "owner": "Arif",
+      "due": "2026-11-13",
+      "status": "done"
+    },
+    {
+      "kind": "task",
+      "created_at": 1793079000,
+      "task": "Find a second battery supplier",
+      "owner": "Sana",
+      "due": "2027-01-31",
+      "status": "open"
+    },
+    {
+      "kind": "task",
+      "created_at": 1793968200,
+      "task": "Reach the 6 B7 customers who have not answered",
+      "owner": "Tara",
+      "due": "2026-11-20",
+      "status": "open"
+    },
+    {
+      "kind": "feedback",
+      "date": "2026-10-14T18:00:00+05:30",
+      "customer": "M2 preorder customer",
+      "rating": 5,
+      "comment": "The test ride sold me. The range display is spot on."
+    },
+    {
+      "kind": "feedback",
+      "date": "2026-10-21T11:30:00+05:30",
+      "customer": "B7 owner",
+      "rating": 3,
+      "comment": "The recall call was polite, but the workshop slot was a week away."
+    },
+    {
+      "date": "2026-11-04T10:15:00+05:30",
+      "from": "Neha (QuickParcel)",
+      "subject": "Rider feedback",
+      "body": "Riders want a phone mount as standard. Otherwise they are very happy with the bikes."
+    },
+    {
+      "kind": "purchase order",
+      "date": "2026-10-01T15:00:00+05:30",
+      "supplier": "Northline Cables",
+      "item": "Replacement brake cable sets for batch B7",
+      "quantity": 340,
+      "status": "delivered"
+    },
+    {
+      "created_at": 1791547200,
+      "channel": "slack",
+      "topic": "launch-night",
+      "messages": [
+        {
+          "author": "Meghna",
+          "text": "Doors open at 6. Are the demo bikes charged?"
+        },
+        {
+          "author": "Arif",
+          "text": "All six are charged and in the van."
+        }
+      ]
+    },
+    {
+      "type": "journal",
+      "date": "2026-10-09T23:50:00+05:30",
+      "entry": "Launch night. 85 preorders and a full hall. Tired and very happy."
     }
   ]
 }

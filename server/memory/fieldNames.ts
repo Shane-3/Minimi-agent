@@ -111,8 +111,10 @@ function normaliseRecord(item: Json): Json {
         return text === "" ? [] : [{ key, text }];
       });
     if (fields.length > 0) {
-      // One field needs no label; several keep theirs ("due: 2026-11-14").
-      record.turns = fields.map(({ key, text }) => ({ text: fields.length === 1 ? text : `${key}: ${text}` }));
+      // A lone field of real text needs no label; otherwise each keeps its own
+      // ("due: 2026-11-14", "location: Koramangala").
+      const unlabelled = fields.length === 1 && fields[0]!.text.split(/\s+/).length >= 4;
+      record.turns = fields.map(({ key, text }) => ({ text: unlabelled ? text : `${key}: ${text}` }));
       fieldTitle = shorten(fields[0]!.text);
       fromFields = true;
     }
@@ -120,7 +122,10 @@ function normaliseRecord(item: Json): Json {
   if (Array.isArray(record.turns)) record.turns = record.turns.map(normaliseTurn);
 
   if (typeof record.type === "string") {
-    const known = TYPE_NAMES[record.type.trim().toLowerCase()];
+    const lower = record.type.trim().toLowerCase();
+    // A kind of note with its own name (journal, memo, document) keeps that
+    // name in its title, as unknown kinds do, so it can be asked for by name.
+    const known = TYPE_NAMES[lower] === "note" && lower !== "note" && lower !== "notes" ? undefined : TYPE_NAMES[lower];
     if (known !== undefined) {
       // A known kind under another name ("email", "call") becomes one of the three.
       record.type = known;
@@ -150,9 +155,25 @@ function shorten(text: string): string {
   return words.length <= 8 ? text : `${words.slice(0, 8).join(" ")}...`;
 }
 
+const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * A date-only value ("2026-12-04", a due date) written with its weekday, "Fri
+ * 4 Dec 2026", worked out here so the model never has to. A calendar day,
+ * so no timezone applies.
+ */
+function dayText(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (match === null) return value;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  if (date.getUTCMonth() !== Number(match[2]) - 1) return value;
+  return `${WEEKDAY_NAMES[date.getUTCDay()]} ${date.getUTCDate()} ${MONTH_NAMES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+}
+
 /** A field's value as one line of text. */
 function textOf(value: unknown): string {
-  if (typeof value === "string") return value.trim();
+  if (typeof value === "string") return dayText(value.trim());
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   if (Array.isArray(value) && value.every((item) => ["string", "number", "boolean"].includes(typeof item))) return value.join(", ");
   if (value === null || value === undefined) return "";

@@ -70,8 +70,8 @@ describe("other tools' field names", () => {
       { date: "2026-11-11", kind: "journal", entry: "Decided to try a free tier with a hard cap." },
     ]);
     expect(task).toMatchObject({ type: "note", title: "Task: Draft the pricing page copy" });
-    expect(task!.segments.map((segment) => segment.text)).toEqual(["task: Draft the pricing page copy", "due: 2026-11-14"]);
-    expect(entry).toMatchObject({ type: "note", title: "Decided to try a free tier with a..." });
+    expect(task!.segments.map((segment) => segment.text)).toEqual(["task: Draft the pricing page copy", "due: Sat 14 Nov 2026"]);
+    expect(entry).toMatchObject({ type: "note", title: "Journal: Decided to try a free tier with a..." });
     expect(entry!.segments.map((segment) => segment.text)).toEqual(["Decided to try a free tier with a hard cap."]);
   });
 

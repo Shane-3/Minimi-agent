@@ -41,7 +41,7 @@ Every question runs the same path, with the model in the middle and code on both
 
 - **Evals:** 10 cases with real model calls and deterministic checks (`npm run eval`): summaries, decisions not made, missing dates and topics, timelines, re-checks, general questions. All 10 pass on current runs; the re-check cases depend on live search.
 - **Larger histories:** two fictional histories (239 and 132 records), too big to read at once, with 38 graded questions: 34 fully right. The misses were relative day counts and one wrong week, mostly flagged by the check. "I can't find it" is never turned into "it didn't happen".
-- **Unit tests:** 392, with the model and Tavily mocked.
+- **Unit tests:** 399, with the model and Tavily mocked.
 
 ## With another week
 

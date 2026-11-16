@@ -149,6 +149,11 @@ export function ImportDialog({ open, importState, timezone, onUpload, onDrag, on
           <h3 className={styles.subheading}>Good to know</h3>
           <ul className={styles.notes}>
             <li>A timestamp without an offset is read in your timezone ({timezone}), and the result says so.</li>
+            <li>
+              Files exported from other tools usually load as they are: names like <code>date</code> or <code>created_at</code>,{" "}
+              <code>messages</code>, <code>from</code> and <code>body</code> are understood, so are Unix times and kinds like
+              "email", "WhatsApp" or "call". A record without a type is read as a chat if it has turns, a note if it is one text.
+            </li>
             <li>A record already loaded is skipped, so uploading the same file twice is safe.</li>
             <li>
               A chat export works too: a plain list of <code>{"{ timestamp, role, content }"}</code> messages. Each day becomes one

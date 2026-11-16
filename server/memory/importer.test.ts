@@ -187,7 +187,7 @@ describe("prepareImport: invalid files", () => {
   });
 
   it("names an invalid type", () => {
-    expect(importError([meeting({ type: "memo" })]).message).toBe(
+    expect(importError([meeting({ type: "spreadsheet" })]).message).toBe(
       'Record 1 ("Acme renewal call"): type must be "meeting", "chat" or "note".',
     );
   });
@@ -229,11 +229,11 @@ describe("prepareImport: invalid files", () => {
     const error = importError([
       meeting({ timestamp: undefined }),
       meeting({ title: "Fine" }),
-      meeting({ title: "Third", type: undefined }),
+      meeting({ title: "Third", type: "spreadsheet" }),
     ]);
     expect(error.details).toEqual([
       'Record 1 ("Acme renewal call") is missing a timestamp.',
-      'Record 3 ("Third") is missing a type.',
+      'Record 3 ("Third"): type must be "meeting", "chat" or "note".',
     ]);
   });
 
@@ -323,7 +323,7 @@ describe("importInto", () => {
   });
 
   it("stores nothing when any record is invalid", () => {
-    expect(() => importInto(store, prepareImport([meeting(), meeting({ type: "memo" })], KOLKATA), KOLKATA)).toThrow(
+    expect(() => importInto(store, prepareImport([meeting(), meeting({ type: "spreadsheet" })], KOLKATA), KOLKATA)).toThrow(
       ImportError,
     );
     expect(store.listRecords()).toEqual([]);

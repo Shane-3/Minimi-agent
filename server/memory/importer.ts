@@ -19,6 +19,7 @@ import {
   type LocalDateTime,
 } from "./dates.ts";
 import type { InsertResult, NewRecord, NewSegment, Store } from "./store.ts";
+import { normaliseFieldNames } from "./fieldNames.ts";
 
 export type ImportErrorCode = "too_large" | "invalid_json" | "empty" | "wrong_shape" | "invalid_timezone";
 
@@ -239,7 +240,8 @@ export function prepareImport(value: unknown, timezone: string): PreparedImport 
   if (!isValidTimeZone(timezone)) {
     throw new ImportError("invalid_timezone", `"${timezone}" isn't a timezone I recognise.`);
   }
-  const items = listOf(value);
+  // Other tools' field names ("date", "messages", "from") are read as ours.
+  const items = listOf(normaliseFieldNames(value));
   if (items.length === 0) {
     throw new ImportError("empty", "No records found in this file.");
   }

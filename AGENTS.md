@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Instructions for any AI coding tool working in this repo. Read `REQUIREMENTS.md`, `ARCHITECTURE.md` and `FRONTEND.md` first. If they conflict with this file, stop and ask.
+Instructions for any AI coding tool working in this repo. Read `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md` and `docs/FRONTEND.md` first. If they conflict with this file, stop and ask.
 
 ## What this project is
 
@@ -25,7 +25,7 @@ npm run typecheck
 5. **Two keys only.** `CEREBRAS_API_KEY` and `TAVILY_API_KEY`. Do not add a dependency that needs another key or a running service.
 6. **`npm install` then `npm run dev` must work** on a clean clone with Node 22. No build step, no global installs, no Docker.
 7. **No copied branding.** Do not draw or imitate Minimi's cat mascot or logo. Use the original mark in `web/assets`.
-8. **Out-of-scope list** in `REQUIREMENTS.md` §8 stays out unless the author says otherwise.
+8. **Out-of-scope list** in `docs/REQUIREMENTS.md` §8 stays out unless the author says otherwise.
 
 ## Code conventions
 
@@ -52,9 +52,9 @@ Build in this order. Do not start a step until the previous one passes its check
 | 6 | `web_search` tool: fan-out, parallel calls, timeouts, dedupe, ranking, dates | Tool unit tests pass with mocked Tavily, including failure of one query |
 | 7 | Agent loop with search, per-claim change report | Eval cases 8 and 9 pass |
 | 8 | Grounding check | Unit tests: matching formats ("$15/user/mo" vs "15 USD per seat"), unmatched figure flagged, check failure does not block |
-| 9 | UI: welcome card, chat, status, chips, sources, check marks, records panel | Every component and state in `FRONTEND.md` works by hand |
-| 10 | Failure cases | Every row in `REQUIREMENTS.md` §5 reproduced and handled |
-| 11 | `DESIGN.md` updated to match what was built; README with setup | A clean clone runs with only the two keys |
+| 9 | UI: welcome card, chat, status, chips, sources, check marks, records panel | Every component and state in `docs/FRONTEND.md` works by hand |
+| 10 | Failure cases | Every row in `docs/REQUIREMENTS.md` §5 reproduced and handled |
+| 11 | `docs/DESIGN.md` updated to match what was built; README with setup | A clean clone runs with only the two keys |
 
 ## Testing
 

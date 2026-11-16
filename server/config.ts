@@ -39,8 +39,8 @@ export const MODEL_BASE_URL = "https://api.cerebras.ai/v1";
  * Models to answer with, best first: the only place model ids are written.
  * CEREBRAS_MODELS in .env replaces the list. Limits are counted per model, so
  * when one hits its limit, or is overloaded, the answer moves to the next.
- * Qwen passed every recall eval with reasoning off and starts answering in
- * well under a second; gpt-oss is the backup.
+ * Qwen starts answering in about a second even with reasoning on;
+ * gpt-oss is the backup.
  */
 export const DEFAULT_MODELS = ["qwen-3.8-27b", "gpt-oss-120b"];
 

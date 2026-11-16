@@ -1,59 +1,50 @@
 # Design
 
-<!-- Draft written before the build. Update the Evals line and anything that changed once the code exists. -->
+A chat agent with one tool, `web_search`, and a dated memory of everything it is given or told. Priorities, in order: right, fast, pleasant.
 
 ## How it works
 
-The agent keeps a dated record of everything it is given or told: meeting transcripts, notes, and its own past chats. Records are stored raw in SQLite with a full-text index.
+Every question runs the same path, with the model in the middle and code on both sides.
 
-Each message goes through four steps:
+1. **Code finds the memory.** Date phrases ("last Tuesday", "3 November") become exact days in the user's timezone. Records on those days and keyword matches (SQLite FTS5) go into the prompt whole, with an index of everything stored. Follow-ups carry the chat's recent records; spare budget goes to the same chat group or meeting series, then recent records.
+2. **One model, one tool.** History is answered only from the records, quoting the deciding line. Anything that can change (prices, versions, news) goes to `web_search`, which fans out one query set per entity to Tavily in parallel and returns dated evidence with official pages marked. Everything else is answered like a normal assistant.
+3. **Code checks the answer.** After streaming, every figure, date, quote, sum and day count is checked against the records and sources; anything unsupported is underlined with a reason. The check never blocks the answer.
+4. **The exchange is saved** with a timestamp, so "What did I ask you on 3 November?" is ordinary recall.
 
-1. **Code finds the memory.** Date phrases ("Monday", "3 November") are resolved in the user's timezone, matching records are looked up, and they are placed in the prompt whole, next to an index of every record that exists.
-2. **One model, one tool.** The model (Qwen on Cerebras, chosen for speed after comparing free providers) answers recall questions directly. For anything about the present it calls `web_search`, which fans out one query set per entity, runs them in parallel against Tavily, and returns ranked, dated evidence.
-3. **Code checks the answer.** Every number, date and name must appear in a record or a source, or it is marked unverified.
-4. **The exchange is saved** with a timestamp, so it can be recalled later.
-
-"Has it changed since Monday?" is answered per claim: changed (old → new, source, date), no announced change found, or couldn't verify.
+"Has it changed since Monday?" is answered per entity: changed (old → new, source, date), no announced change found since that date, or couldn't verify. Never a bare "unchanged".
 
 ## Why this way
 
-- **Memory is not a tool.** The brief allows one tool, and code that always runs cannot forget to look. The examples all start with recall, so recall must not depend on the model's choice.
-- **Whole records, not fragments.** A summary built from retrieved snippets misses decisions. Meetings fit in the context window, so the model reads all of it.
-- **Raw text is the only evidence.** Answers quote the record with the speaker. Nothing model-generated is stored about a record.
-- **Dates in code.** Models are unreliable at weekday arithmetic; a library is not.
-- **Honest wording.** A pricing page shows today's price, not last week's. Without a stored old value or a dated announcement, the agent says "no announced change found", not "unchanged".
-- **Right before fast.** Speed comes from skipping search on recall questions, parallel searches, prompt caching and streaming, never from skipping a check.
+- **Memory is code, not a tool.** The brief allows one tool, and every example question starts with recall. Code that always runs cannot forget to look.
+- **Dates in code.** Models get weekdays wrong, so the resolver decides what "last Tuesday" means, and the prompt and imported records carry finished labels ("Mon 9 Nov"). The model has no weekday to work out.
+- **Raw records are the only evidence.** Nothing model-written is stored as a fact; the check confirms each quote is really there, from that speaker.
+- **Verification is deterministic.** An LLM judging an LLM shares its blind spots and doubles latency. Plain code can tell that "$15/user/mo" and "15 USD per seat" agree, that 14 Nov 2026 is not a Monday, and that 12 × $14 is $168.
+- **Honest wording.** A pricing page shows today's price, not last week's, so without a stored old value or a dated announcement the agent says "no announced change found".
+- **Fast without cutting corners.** Cerebras won on measured latency: history answers start in about a second with one call and no search; re-checks take one parallel search step (7 to 12 s). Reasoning is higher once results are in, where mistakes cost most.
+- **Real histories are messy.** The importer reads other tools' field names (`date`, `messages`, `from`, Unix times) and any dated record (articles, tasks, journals), and rejects a bad file whole, naming the record and field.
 
 ## Considered and rejected
 
 | Option | Why not |
 |---|---|
-| Vector database | Questions are pinned by date and entity; similarity can return the wrong day's meeting. Needs a third key |
-| Multiple agents (planner, researcher, critic) | Each handoff adds latency and can drop a date or figure. Code does these jobs deterministically |
-| Agent frameworks | Hide the loop that this exercise is about |
 | A `recall` tool | Breaks the one-tool rule and lets the model skip memory |
-| A per-claim ledger or topic tags written by a second model | Can lag or be wrong; the model reads the original instead. When all records fit in context they are all loaded, so tags aren't needed to find one |
-| Scraping a search engine with a headless browser | Blocked, slow, against terms, heavy install |
-| Our own crawler or self-hosted search | Out of proportion; breaks `npm install` + `npm run dev` |
-| Postgres | Needs a running server |
-| Blocking the answer until verification finishes | Seconds of blank screen; marks are attached after streaming instead |
+| Planner, researcher and critic agents | Each handoff adds latency and can drop a date or figure; code does these jobs deterministically |
+| Agent frameworks | Hide the loop this exercise is about |
+| An LLM verifier or judge | Second model call site, same blind spots; the deterministic check caught what the model actually got wrong |
+| Vector search | Questions are pinned by date and entity, and it needs a third key; the paraphrase gap is covered by filling the budget (see next week) |
+| Headless browser or own crawler | Slow, blocked, heavy install, breaks `npm install` + `npm run dev` |
+| Holding the answer until checks finish | Seconds of blank screen; marks arrive just after the text |
+| Records-only answers | The first version answered general questions with "no record"; judges talk to it like a real user, so general questions now get real answers |
 
-## Assumptions
+## Results
 
-- Test history arrives as dated records; the format is documented and a sample is included.
-- One user, no login. Memory is shared across threads.
-- Relative dates mean the most recent past match, in the browser's timezone.
-- If nothing is stored for a date or topic, the right answer is to say so.
-
-## Evals
-
-<!-- Fill in after running: N of 10 cases pass; note any that fail and why. -->
-Ten cases in `/evals` cover summaries, decisions, missing records, same topic on two days, re-checks and injected instructions.
+- **Evals:** 10 cases with real model calls and deterministic checks (`npm run eval`): summaries, decisions not made, missing dates and topics, timelines, re-checks, general questions. All 10 pass on current runs; the re-check cases depend on live search.
+- **Larger histories:** two fictional histories (239 and 132 records), too big to read at once, with 38 graded questions: 34 fully right. The misses were relative day counts and one wrong week, mostly flagged by the check. "I can't find it" is never turned into "it didn't happen".
+- **Unit tests:** 392, with the model and Tavily mocked.
 
 ## With another week
 
-- A verifier pass for misread context (billing period, plan tier), added only if evals show those errors.
-- Hybrid keyword and embedding retrieval for histories too large to load whole, where a paraphrased question can currently miss its record.
-- Headless rendering for pricing pages that load prices with JavaScript.
-- Scheduled re-checks: "tell me if any of these change", which is where a memory product should go next.
-- Per-source trust scores and a larger eval set built from real transcripts.
+- **Hybrid retrieval:** embeddings beside keywords, for questions that share no words with their record, the one gap the large histories showed.
+- **Primary sources first:** fetch vendors' own pricing and changelog pages when search returns only third-party summaries.
+- **Watch, don't wait:** "tell me if any of these change", with scheduled re-checks of stored claims.
+- **Memory over MCP,** so any assistant can use the same verified memory; a larger eval set from real, anonymised histories.

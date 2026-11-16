@@ -154,5 +154,16 @@ export function evalCases(context: EvalContext): EvalCase[] {
         lacks("claims no change it cannot show", /\*\*[^*\n]+\*\*\s*:?\s*\**changed\b/i),
       ],
     },
+    {
+      id: 10,
+      name: "General question, not about the records",
+      question: "What's the difference between Postgres and MySQL for a small SaaS?",
+      checks: [
+        // A real user asks things that are not in their history; "no record" is the wrong answer.
+        lacks("does not answer with no record", NO_RECORD),
+        contains("talks about Postgres", /Postgres/i),
+        contains("talks about MySQL", /MySQL/i),
+      ],
+    },
   ];
 }

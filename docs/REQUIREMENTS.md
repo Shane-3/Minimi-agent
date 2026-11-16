@@ -2,7 +2,7 @@
 
 ## 1. Goal
 
-A chat agent that remembers what happened (meeting transcripts, notes, past chats) and answers questions about it with no invented details. When a question asks whether something is still true, it checks the live web and reports what changed.
+A chat agent with web search that is good to talk to about anything, and that remembers what happened (meeting transcripts, notes, past chats) and answers questions about it with no invented details. When a question asks whether something is still true, it checks the live web and reports what changed.
 
 Judged on: answers fast, gets things right, good to talk to. Order of priority when they conflict: right, then fast, then pleasant.
 
@@ -18,8 +18,8 @@ Judged on: answers fast, gets things right, good to talk to. Order of priority w
 ## 3. Functional requirements
 
 ### Memory
-- F1. Import records from JSON (format in ARCHITECTURE.md §3). Meetings, notes and chat exports.
-- F2. One-click sample history, with dates relative to today.
+- F1. Import records from JSON (format in ARCHITECTURE.md §3). Meetings, notes and chat exports. Common field names from other tools (date, messages, from, body, Unix times, kinds like "email") are read too, so exported history loads as it is.
+- F2. One-click sample history, with dates relative to today, plus two larger fictional samples.
 - F3. Every live question and answer is stored with a timestamp and is recallable later, across threads.
 - F4. Date phrases resolve in code, in the user's timezone: weekday names, "last Tuesday", "yesterday", "3 November", "two weeks ago".
 - F5. A question about a topic covered on several days returns all of them as a dated timeline, and says which is latest.
@@ -30,6 +30,9 @@ Judged on: answers fast, gets things right, good to talk to. Order of priority w
 - F8. Each decision or figure shows a short quote and the speaker.
 - F9. "Decided" and "discussed but not decided" are kept apart.
 - F10. If the record does not contain what was asked, the agent says so. It never fills the gap.
+
+### Everything else
+- F10a. Questions not about the user's history (explanations, comparisons, advice, writing, small talk) are answered like a capable general assistant, bringing in the records where they are relevant. "No record" is only an answer to a question about the user's history.
 
 ### Web re-check
 - F11. Prices, versions and "is it still true" are always searched, never answered from model memory.

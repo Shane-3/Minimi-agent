@@ -13,8 +13,8 @@ How it works and why: [docs/DESIGN.md](docs/DESIGN.md).
 You need Node 22 or later, and two free API keys.
 
 ```bash
-git clone <this repo>
-cd <the cloned folder>
+git clone https://github.com/Shane-3/Minimi-agent.git
+cd Minimi-agent
 npm install
 cp .env.example .env      # then put both keys in .env
 npm run dev
